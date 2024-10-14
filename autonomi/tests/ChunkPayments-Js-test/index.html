@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MetaMask and Ethers.js Example</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.0/dist/ethers.umd.min.js"></script>
+</head>
+<body>
+    <button id="connectButton">Connect to MetaMask</button>
+    <button id="submitTransactionButton">Submit Data Payments</button>
+    
+    <script src="./abi.js"></script>
+    <script>
+        // Contract address (replace with your actual contract address)
+        const contractAddress = '0x887930F30EDEb1B255Cd2273C3F4400919df2EFe'; 
+
+        let signer;
+        let contract;
+        let account_addr;
+        let provider;
+const callData = "0x05aa488a00000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000015000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001db41d307cd2e610acd4239d8298485f0635627b1ffcd0c5cd64553567941b374000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001b7fe2b95017924c4b9f9570f3df413170b0f39ec963c6d479c6142f91730683e000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da0600000000000000000000000000000000000000000000000000000000000000013f7cda96456f8754c652a22ce9ce1278c7843effe772a0ebb65fd85de7c1506c000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001dd8fdf6545130df4cb5807831b10bb6bbff1d95bc7b30985a3a31f8bbe2aac08000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001cf1aed54371d4c81e7360e8cc591eb0b04ffba204ff845befeadfa0ab49316b7000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da0600000000000000000000000000000000000000000000000000000000000000015cf3c6a5d65236a9717fb1d977df9eda7c75fe1072d2eb42a88e087569a297b0000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001ffbecb9fea623f0dd588bf428dfc7f85452c866148a4ff224049b84c937a2158000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da0600000000000000000000000000000000000000000000000000000000000000019b979a582079eef035c63c49c5ba266a85f022c75ff15a6159b4ce96c25814c7000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001a50f696f99a4db0bdb598462afa7fe2b2a6db6a72f7895aeedd03f7898967d51000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001d11a602b507d2ed096c6700da4d75c3893edc28488929fd1da448e7e5b8e015b000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001b7df60e519b8df9706997ada259b4896309db32583a2e3156ebe69c3f1ba80e8000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da0600000000000000000000000000000000000000000000000000000000000000014c1bb31deb5d8228287de39cea398d0861a0db8d62c1d395416aac4abee2b034000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da0600000000000000000000000000000000000000000000000000000000000000013844a8558ae2547fec0af2abf153c820dd4d3da8b1e972a1943dc4c1ddd3d852000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da06000000000000000000000000000000000000000000000000000000000000000151ca8159c6925dc6cec0bb38d9887565a5022950de17573b1778a0848939268d000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da06000000000000000000000000000000000000000000000000000000000000000176a4b9f2bb35e05fe840a95ab07948b2f625aff984d915d7253e3d0a469a0375000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001245556ebc58376aa5f3640df862aae94e868ce9d3707a45101f878feb8d25e17000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da060000000000000000000000000000000000000000000000000000000000000001032521594f46cc71e62fd99f7a78744aa0c75ad6d4ebda26e8881173931f4eb4000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da0600000000000000000000000000000000000000000000000000000000000000015c2b20487a4054ed9ade0b535202baed6e30a3284ddc78ba3df95f89a6708632000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da06000000000000000000000000000000000000000000000000000000000000000120d73c91b58abd662937e229d50a1badb35e50ca27681a588d8ea8a6dd32aa3a000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da0600000000000000000000000000000000000000000000000000000000000000015466d6324988022d81dc9d7d38da955a38bb2d10c2891f92a3518ab58a37bc7d000000000000000000000000ecb81133da643c98fa6ad2b4c1902d476e45da0600000000000000000000000000000000000000000000000000000000000000018b5e9d9f0ef400c62a33e65310416bc7cf90d720fa8372ccc2ca131fadb125b7";
+let estimatedGas;
+        // Function to request MetaMask account connection
+        async function connectToMetaMask() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    // Request account access from MetaMask
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+                     provider = new ethers.providers.Web3Provider(window.ethereum);
+
+                    // Get the signer (the current MetaMask account)
+                    signer = provider.getSigner();
+
+                //      estimatedGas = await provider.estimateGas({
+                //     to:contractAddress,
+                //     data: callData,
+                // });
+                // console.log("estimatedGas is ", estimatedGas);
+
+                    // Contract instance using the signer
+                    contract = new ethers.Contract(contractAddress, ABI, signer);
+                
+                    console.log("Connected to MetaMask!");
+                    account_addr=  await signer.getAddress();
+                    // contract.constructor("0x59Df450f45Ac105e8Eb639d668cd1b8fFD87C5F1");
+
+                } catch (error) {
+                    console.error("User denied account access or other error", error);
+                }
+            } else {
+                console.error('MetaMask is not installed!');
+            }
+        }
+
+        // Function to submit data payments
+        async function submitDataPayments() {
+            const dataPayments = [
+                {
+                    rewardsAddress: "0x59Df450f45Ac105e8Eb639d668cd1b8fFD87C5F1",
+                    amount: ethers.utils.parseUnits("1", 1), // 10 tokens
+                    quoteHash: "0xb7a90bfe9dc3eeab8ed3db6fc32d9d1f9c219578e54a4be60010304d2ff46a6a" 
+                },
+                // {
+                //     rewardsAddress: "0xRecipientAddress2",
+                //     amount: ethers.utils.pa rseUnits("20", 18), // 20 tokens
+                //     quoteHash: ethers.utils.formatBytes32String("some-hash-2")
+                // }
+            ];
+
+            
+        
+            try {
+                // const ret_value = contract.approve()
+                console.log("attempting to send money from ", account_addr);
+                
+                
+
+                const tx = await signer.sendTransaction({
+                    to: contractAddress,
+                    data: callData,
+                    gasLimit: ethers.utils.hexlify(3000000),
+                });
+
+                const receipt = await tx.wait();
+                console.log("transaction confirmed in block", receipt.blockNumber);
+
+                // const tx = await contract.submitDataPayments(dataPayments);
+                // console.log("Transaction hash:", tx.hash);
+
+                // // Wait for the transaction to be mined
+                // const receipt = await tx.wait();
+                // console.log("Transaction was mined in block:", receipt.blockNumber);
+            } catch (error) {
+                console.error("Error submitting transaction:", error);
+            }
+        }
+
+        // Attach the function to the button click events
+        document.getElementById('connectButton').addEventListener('click', connectToMetaMask);
+        document.getElementById('submitTransactionButton').addEventListener('click', submitDataPayments);
+    </script>
+
+</body>
+</html>
