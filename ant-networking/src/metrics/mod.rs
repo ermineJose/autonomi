@@ -207,6 +207,7 @@ impl NetworkMetricsRecorder {
             shunned_by_close_group.clone(),
             shunned_by_old_close_group.clone(),
         );
+
         let network_metrics = Self {
             libp2p_metrics,
             #[cfg(feature = "upnp")]

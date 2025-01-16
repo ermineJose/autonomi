@@ -432,6 +432,7 @@ impl NetworkBuilder {
             ProtocolSupport::Full,
             #[cfg(feature = "upnp")]
             upnp,
+            Some(root_dir.clone())
         )?;
 
         // Listen on the provided address
@@ -471,6 +472,7 @@ impl NetworkBuilder {
             ProtocolSupport::Outbound,
             #[cfg(feature = "upnp")]
             false,
+            None,
         )?;
 
         Ok((network, net_event_recv, driver))
@@ -484,6 +486,7 @@ impl NetworkBuilder {
         is_client: bool,
         req_res_protocol: ProtocolSupport,
         #[cfg(feature = "upnp")] upnp: bool,
+        root_dir: Option<PathBuf>,
     ) -> Result<(Network, mpsc::Receiver<NetworkEvent>, SwarmDriver)> {
         let identify_protocol_str = IDENTIFY_PROTOCOL_STR
             .read()
@@ -554,6 +557,58 @@ impl NetworkBuilder {
                     "identify_protocol_str".to_string(),
                     identify_protocol_str.clone(),
                 )]),
+            );
+
+            let metadata_extended_sub_reg = metrics_registries
+                .metadata_extended
+                .sub_registry_with_prefix("ant-networking");
+
+            metadata_extended_sub_reg.register(
+                "peer_id",
+                "Identifier of a peer of the network",
+                Info::new(vec![("peer_id".to_string(), peer_id.to_string())]),
+            );
+
+            metadata_extended_sub_reg.register(
+                "pid",
+                "id of the node process",
+                Info::new(vec![("pid".to_string(), std::process::id().to_string())]),
+            );
+
+            metadata_extended_sub_reg.register(
+                "bin_version",
+                "Package version of the node",
+                Info::new(vec![("bin_version".to_string(), env!("CARGO_PKG_VERSION").to_string())]),
+            );
+
+
+            if let Some(root_dir) = root_dir.clone() {
+                metadata_extended_sub_reg.register(
+                    "data_dir",
+                    "Root directory of the node",
+                    Info::new(vec![("root_dir".to_string(), root_dir.clone().to_string_lossy().to_string())]),
+                );
+            }
+
+            if let Some(log_dir) = root_dir {
+                let log_dir = log_dir.join("logs");
+                metadata_extended_sub_reg.register(
+                    "log_dir",
+                    "Root directory of the node",
+                    Info::new(vec![("log_dir".to_string(), log_dir.clone().to_string_lossy().to_string())]),
+                );
+            }
+
+            metadata_extended_sub_reg.register(
+                "uptime",
+                "id of the node process",
+                Info::new(vec![("pid".to_string(), "0".to_string())]),
+            );
+
+            metadata_extended_sub_reg.register(
+                "wallet balance",
+                "id of the node process",
+                Info::new(vec![("wallet_balance".to_string(), "0".to_string())]),
             );
 
             run_metrics_server(metrics_registries, port);
