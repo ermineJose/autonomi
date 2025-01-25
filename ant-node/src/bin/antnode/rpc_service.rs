@@ -86,9 +86,8 @@ impl AntNode for SafeNodeRpcService {
             .get_swarm_local_state()
             .await
             .expect("failed to get local swarm state");
-        let connected_peers = state.connected_peers.iter().map(|p| p.to_bytes()).collect();
+        let connected_peers:Vec<Vec<u8>> = state.connected_peers.iter().map(|p| p.to_bytes()).collect();
         let listeners = state.listeners.iter().map(|m| m.to_string()).collect();
-
         let resp = Response::new(NetworkInfoResponse {
             connected_peers,
             listeners,

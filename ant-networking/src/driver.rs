@@ -561,7 +561,7 @@ impl NetworkBuilder {
 
             let metadata_extended_sub_reg = metrics_registries
                 .metadata_extended
-                .sub_registry_with_prefix("ant-networking");
+                .sub_registry_with_prefix("ant_networking");
 
             metadata_extended_sub_reg.register(
                 "peer_id",
@@ -598,18 +598,6 @@ impl NetworkBuilder {
                     Info::new(vec![("log_dir".to_string(), log_dir.clone().to_string_lossy().to_string())]),
                 );
             }
-
-            metadata_extended_sub_reg.register(
-                "uptime",
-                "id of the node process",
-                Info::new(vec![("pid".to_string(), "0".to_string())]),
-            );
-
-            metadata_extended_sub_reg.register(
-                "wallet balance",
-                "id of the node process",
-                Info::new(vec![("wallet_balance".to_string(), "0".to_string())]),
-            );
 
             run_metrics_server(metrics_registries, port);
             Some(metrics_recorder)

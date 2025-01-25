@@ -14,9 +14,10 @@ use crate::helpers::{
 use ant_bootstrap::PeersArgs;
 use ant_evm::{EvmNetwork, RewardsAddress};
 use ant_logging::LogFormat;
+use ant_service_management::metric::MetricClient;
 use ant_service_management::{
     control::ServiceControl,
-    rpc::{RpcActions, RpcClient},
+    rpc::RpcActions,
     NodeRegistry, NodeServiceData, ServiceStatus,
 };
 use color_eyre::eyre::OptionExt;
@@ -277,8 +278,7 @@ pub async fn run_network(
         };
         let rpc_socket_addr =
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), rpc_free_port);
-        let rpc_client = RpcClient::from_socket_addr(rpc_socket_addr);
-
+        let metric_client = MetricClient::new(metrics_free_port.unwrap());
         let number = (node_registry.nodes.len() as u16) + 1;
         let node = run_node(
             RunNodeOptions {
@@ -294,9 +294,10 @@ pub async fn run_network(
                 version: get_bin_version(&launcher.get_antnode_path())?,
             },
             &launcher,
-            &rpc_client,
+            &metric_client,
         )
         .await?;
+
         node_registry.nodes.push(node.clone());
         let bootstrap_peers = node
             .listen_addr
@@ -323,8 +324,7 @@ pub async fn run_network(
         };
         let rpc_socket_addr =
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), rpc_free_port);
-        let rpc_client = RpcClient::from_socket_addr(rpc_socket_addr);
-
+        let metric_client = MetricClient::new(metrics_free_port.unwrap());
         let number = (node_registry.nodes.len() as u16) + 1;
         let node = run_node(
             RunNodeOptions {
@@ -340,7 +340,7 @@ pub async fn run_network(
                 version: get_bin_version(&launcher.get_antnode_path())?,
             },
             &launcher,
-            &rpc_client,
+            &metric_client,
         )
         .await?;
         node_registry.nodes.push(node);
@@ -382,7 +382,7 @@ pub struct RunNodeOptions {
 pub async fn run_node(
     run_options: RunNodeOptions,
     launcher: &dyn Launcher,
-    rpc_client: &dyn RpcActions,
+    metric_client: &dyn RpcActions,
 ) -> Result<NodeServiceData> {
     info!("Launching node {}...", run_options.number);
     println!("Launching node {}...", run_options.number);
@@ -397,9 +397,10 @@ pub async fn run_node(
     )?;
     launcher.wait(run_options.interval);
 
-    let node_info = rpc_client.node_info().await?;
+    let node_info = metric_client.node_info().await?;
     let peer_id = node_info.peer_id;
-    let network_info = rpc_client.network_info().await?;
+    let network_info = metric_client.network_info().await?;
+    println!("network_info from the antctl  is {:?}", network_info);
     let connected_peers = Some(network_info.connected_peers);
     let listen_addrs = network_info
         .listeners
@@ -472,8 +473,8 @@ async fn validate_network(node_registry: &mut NodeRegistry, peers: Vec<Multiaddr
     all_peers.extend(additional_peers);
 
     for node in node_registry.nodes.iter() {
-        let rpc_client = RpcClient::from_socket_addr(node.rpc_socket_addr);
-        let net_info = rpc_client.network_info().await?;
+        let metric_client = MetricClient::new(node.metrics_port.unwrap());
+        let net_info = metric_client.network_info().await?;
         let peers = net_info.connected_peers;
         let peer_id = node.peer_id.ok_or_eyre("The PeerId was not set")?;
         debug!("Node {peer_id} has {} peers", peers.len());
