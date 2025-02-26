@@ -708,16 +708,16 @@ jobs:
           node_count=$(ls "${{ matrix.node_data_path }}" | wc -l)
           echo "Node dir count is $node_count"
 
-      - name: Get restart of nodes using rg
-        shell: bash
-        timeout-minutes: 1
-        # get the counts, then the specific line, and then the digit count only
-        # then check we have an expected level of restarts
-        # TODO: make this use an env var, or relate to testnet size
-        run: |
-          restart_count=$(rg "Node is restarting in" "${{ matrix.node_data_path }}" -c --stats | \
-            rg "(\d+) matches" | rg "\d+" -o)
-          echo "Restarted $restart_count nodes"
+      # - name: Get restart of nodes using rg
+      #   shell: bash
+      #   timeout-minutes: 1
+      #   # get the counts, then the specific line, and then the digit count only
+      #   # then check we have an expected level of restarts
+      #   # TODO: make this use an env var, or relate to testnet size
+      #   run: |
+      #     restart_count=$(rg "Node is restarting in" "${{ matrix.node_data_path }}" -c --stats | \
+      #       rg "(\d+) matches" | rg "\d+" -o)
+      #     echo "Restarted $restart_count nodes"
 
       # `PeerRemovedFromRoutingTable` now only happens when a peer reported as `BadNode`.
       # Otherwise kad will remove a `dropped out node` directly from RT.
@@ -853,9 +853,9 @@ jobs:
           log_file_prefix: safe_test_logs_data_location
           platform: ${{ matrix.os }}
 
-      - name: Verify restart of nodes using rg
-        shell: bash
-        timeout-minutes: 1
+      # - name: Verify restart of nodes using rg
+      #   shell: bash
+      #   timeout-minutes: 1
         # get the counts, then the specific line, and then the digit count only
         # then check we have an expected level of restarts
         #
@@ -867,20 +867,20 @@ jobs:
         # With the further reduction of replication frequency,
         # it now becomes harder to detect a `dropped out node` as a `failed to replicate` node.
         # Hence now remove the assertion check and replace with a print out only.
-        run: |
-          node_count=$(ls "${{ matrix.node_data_path }}" | wc -l)
-          echo "Node dir count is $node_count"
-          restart_count=$(rg "Node is restarting in" "${{ matrix.node_data_path }}" -c --stats | \
-            rg "(\d+) matches" | rg "\d+" -o)
-          echo "Restart $restart_count nodes"
-          if ! rg "PeerRemovedFromRoutingTable" "${{ matrix.node_data_path }}" -c --stats
-          then
-            echo "No peer removal count found"
-            exit 0
-          fi
-          peer_removed=$(rg "PeerRemovedFromRoutingTable" "${{ matrix.node_data_path }}" -c --stats | \
-            rg "(\d+) matches" | rg "\d+" -o)
-          echo "PeerRemovedFromRoutingTable $peer_removed times"
+        # run: |
+        #   node_count=$(ls "${{ matrix.node_data_path }}" | wc -l)
+        #   echo "Node dir count is $node_count"
+        #   restart_count=$(rg "Node is restarting in" "${{ matrix.node_data_path }}" -c --stats | \
+        #     rg "(\d+) matches" | rg "\d+" -o)
+        #   echo "Restart $restart_count nodes"
+        #   if ! rg "PeerRemovedFromRoutingTable" "${{ matrix.node_data_path }}" -c --stats
+        #   then
+        #     echo "No peer removal count found"
+        #     exit 0
+        #   fi
+        #   peer_removed=$(rg "PeerRemovedFromRoutingTable" "${{ matrix.node_data_path }}" -c --stats | \
+        #     rg "(\d+) matches" | rg "\d+" -o)
+        #   echo "PeerRemovedFromRoutingTable $peer_removed times"
 
       # Only error out after uploading the logs
       - name: Don't log raw data
