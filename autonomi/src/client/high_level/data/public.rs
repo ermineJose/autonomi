@@ -50,7 +50,7 @@ impl Client {
         for chunk in &chunks {
             xor_names.push((*chunk.name(), chunk.size()));
         }
-
+        println!("pay_for_content_addrs");
         // Pay for all chunks + data map chunk
         info!("Paying for {} addresses", xor_names.len());
         let (receipt, skipped_payments) = self
@@ -60,7 +60,7 @@ impl Client {
 
         // Upload all the chunks in parallel including the data map chunk
         debug!("Uploading {} chunks", chunks.len());
-
+        println!("upload chunks with retries");
         let mut failed_uploads = self
             .upload_chunks_with_retries(
                 chunks

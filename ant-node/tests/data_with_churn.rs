@@ -12,19 +12,21 @@ use crate::common::{
     client::{get_client_and_funded_wallet, get_node_count},
     NodeRestart,
 };
+use ant_evm::Amount;
 use ant_logging::LogBuilder;
+use ant_node::spawn::network_spawner::NetworkSpawner;
 use ant_protocol::{
     storage::{ChunkAddress, GraphEntry, GraphEntryAddress, PointerTarget, ScratchpadAddress},
     NetworkAddress,
 };
-use autonomi::{data::DataAddress, Client, Wallet};
+use autonomi::{data::DataAddress, Client, ClientConfig, ClientOperatingStrategy, Wallet};
 use bls::{PublicKey, SecretKey};
 use bytes::Bytes;
 use common::client::transfer_to_new_wallet;
 use eyre::{bail, ErrReport, Result};
 use rand::Rng;
 use self_encryption::MAX_CHUNK_SIZE;
-use std::{
+use std::{str::FromStr,
     collections::{BTreeMap, HashMap, VecDeque},
     fmt,
     fs::create_dir_all,
@@ -32,7 +34,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tempfile::tempdir;
-use test_utils::gen_random_data;
+use test_utils::{evm::get_funded_wallet, gen_random_data};
 use tokio::{sync::RwLock, task::JoinHandle, time::sleep};
 use tracing::{debug, error, info, trace, warn};
 use xor_name::XorName;
@@ -77,6 +79,38 @@ type ContentErredList = Arc<RwLock<BTreeMap<NetworkAddress, ContentError>>>;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn data_availability_during_churn() -> Result<()> {
+    println!("Test started");
+
+    let evm_testnet = evmlib::testnet::Testnet::new().await;
+    let evm_network = evm_testnet.to_network();
+    println!("evm_network is {:?}", evm_network);
+    let evm_sk = evm_testnet.default_wallet_private_key();
+    let funded_wallet = Wallet::new_from_private_key(evm_network.clone(), &evm_sk).expect("Invalid private key");
+    println!("wallet initiated");
+    
+    let network = NetworkSpawner::new()
+            .with_evm_network(evm_network.clone())
+            .with_local(true)
+            .with_size(20)
+            .spawn()
+            .await
+            .unwrap();
+    println!("network spawned");
+    let peer = network.bootstrap_peer().await;
+    
+    // let client = Client::init_with_peers(vec![peer]).await.unwrap();
+
+    let config = ClientConfig {
+        local: true,
+        peers: Some(vec![peer]),
+        evm_network: evm_network.clone(),
+        strategy: autonomi::ClientOperatingStrategy::default(),
+    };
+    let client = Client::init_with_config(config).await.unwrap();
+
+    println!("client is {:?}", client.evm_network());
+    println!("client initiated");
+
     let _log_appender_guard = LogBuilder::init_multi_threaded_tokio_test("data_with_churn", false);
 
     let test_duration = if let Ok(str) = std::env::var("TEST_DURATION_MINS") {
@@ -118,11 +152,11 @@ async fn data_availability_during_churn() -> Result<()> {
         if chunks_only { " (Chunks only)" } else { "" }
     );
 
-    let (client, main_wallet) = get_client_and_funded_wallet().await;
+    // let (client, main_wallet) = get_client_and_funded_wallet().await;
 
     info!(
         "Client and wallet created. Main wallet address: {:?}",
-        main_wallet.address()
+        funded_wallet.address()
     );
 
     // Shared bucket where we keep track of content created/stored on the network
@@ -130,9 +164,18 @@ async fn data_availability_during_churn() -> Result<()> {
 
     println!("Uploading some chunks before carry out node churning");
     info!("Uploading some chunks before carry out node churning");
-
-    let chunk_wallet = transfer_to_new_wallet(&main_wallet, TOKENS_TO_TRANSFER).await?;
+    println!("creating chunk_wallet");
+    
+    let chunk_wallet = Wallet::new_with_random_wallet(evm_network.clone());
+    funded_wallet.transfer_tokens(chunk_wallet.address(), Amount::from(TOKENS_TO_TRANSFER)).await?;
+    funded_wallet.transfer_gas_tokens(
+        chunk_wallet.address(),
+        Amount::from_str("10000000000000000000")?,
+    )
+    .await?;
+    
     // Spawn a task to store Chunks at random locations, at a higher frequency than the churning events
+    println!("Storing chunks");
     let store_chunks_handle = store_chunks_task(
         client.clone(),
         chunk_wallet,
@@ -143,7 +186,14 @@ async fn data_availability_during_churn() -> Result<()> {
     // Spawn a task to create Pointers at random locations,
     // at a higher frequency than the churning events
     let create_pointer_handle = if !chunks_only {
-        let pointer_wallet = transfer_to_new_wallet(&main_wallet, TOKENS_TO_TRANSFER).await?;
+        println!("Processing pointer wallet");
+        let pointer_wallet = Wallet::new_with_random_wallet(evm_network.clone());
+        funded_wallet.transfer_tokens(pointer_wallet.address(), Amount::from(TOKENS_TO_TRANSFER)).await?;
+        funded_wallet.transfer_gas_tokens(
+            pointer_wallet.address(),
+            Amount::from_str("10000000000000000000")?,
+        )
+        .await?;
         let create_pointer_handle = create_pointers_task(
             client.clone(),
             pointer_wallet,
@@ -154,11 +204,19 @@ async fn data_availability_during_churn() -> Result<()> {
     } else {
         None
     };
+    println!("Processed pointer handle");
 
     // Spawn a task to create GraphEntry at random locations,
     // at a higher frequency than the churning events
     let create_graph_entry_handle = if !chunks_only {
-        let graph_entry_wallet = transfer_to_new_wallet(&main_wallet, TOKENS_TO_TRANSFER).await?;
+        println!("Processing graph entry wallet");
+        let graph_entry_wallet = Wallet::new_with_random_wallet(evm_network.clone());
+        funded_wallet.transfer_tokens(graph_entry_wallet.address(), Amount::from(TOKENS_TO_TRANSFER)).await?;
+        funded_wallet.transfer_gas_tokens(
+            graph_entry_wallet.address(),
+            Amount::from_str("10000000000000000000")?,
+        )
+        .await?;
         let create_graph_entry_handle = create_graph_entry_task(
             client.clone(),
             graph_entry_wallet,
@@ -169,11 +227,19 @@ async fn data_availability_during_churn() -> Result<()> {
     } else {
         None
     };
+    println!("Processed graph entry");
 
     // Spawn a task to create ScratchPad at random locations,
     // at a higher frequency than the churning events
     let create_scratchpad_handle = if !chunks_only {
-        let scratchpad_wallet = transfer_to_new_wallet(&main_wallet, TOKENS_TO_TRANSFER).await?;
+        println!("Processing scratch pad");
+        let scratchpad_wallet = Wallet::new_with_random_wallet(evm_network.clone());
+        funded_wallet.transfer_tokens(scratchpad_wallet.address(), Amount::from(TOKENS_TO_TRANSFER)).await?;
+        funded_wallet.transfer_gas_tokens(
+            scratchpad_wallet.address(),
+            Amount::from_str("10000000000000000000")?,
+        )
+        .await?;
         let create_scratchpad_handle = create_scratchpad_task(
             client.clone(),
             scratchpad_wallet,
@@ -184,6 +250,8 @@ async fn data_availability_during_churn() -> Result<()> {
     } else {
         None
     };
+
+    println!("Processed scratchpad");
 
     // Spawn a task to churn nodes
     churn_nodes_task(Arc::clone(&churn_count), test_duration, churn_period);
@@ -660,6 +728,7 @@ fn store_chunks_task(
     content: ContentList,
     churn_period: Duration,
 ) -> JoinHandle<Result<()>> {
+    println!("store_chunks_task");
     let handle: JoinHandle<Result<()>> = tokio::spawn(async move {
         let temp_dir = tempdir().expect("Can not create a temp directory for store_chunks_task!");
         let output_dir = temp_dir.path().join("chunk_path");

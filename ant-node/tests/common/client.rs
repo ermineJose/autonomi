@@ -147,9 +147,9 @@ impl LocalNetwork {
         let gas_balance = from.balance_of_gas_tokens().await?;
 
         debug!("Wallet balance: {wallet_balance}, Gas balance: {gas_balance}");
-
+        println!("new wallet creation");
         let new_wallet = get_new_wallet()?;
-
+        println!("new wallet created");
         from.transfer_tokens(new_wallet.address(), Amount::from(amount))
             .await?;
 
