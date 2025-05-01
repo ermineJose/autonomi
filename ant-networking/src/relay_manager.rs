@@ -22,7 +22,7 @@ use std::time::Instant;
 #[cfg(feature = "open-metrics")]
 use std::{collections::btree_map::Entry, time::SystemTime};
 
-const MAX_CONCURRENT_RELAY_CONNECTIONS: usize = 2;
+const MAX_CONCURRENT_RELAY_CONNECTIONS: usize = 1;
 const MAX_POTENTIAL_CANDIDATES: usize = 1000;
 
 /// We could get multiple incoming connections from the same peer through multiple relay servers, and only one of them
