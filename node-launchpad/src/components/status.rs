@@ -155,7 +155,7 @@ impl Status<'_> {
             port_to: config.port_to,
             error_popup: None,
             storage_mountpoint: config.storage_mountpoint.clone(),
-            available_disk_space_gb: get_available_space_b(&config.storage_mountpoint)? / GB,
+            available_disk_space_gb: (get_available_space_b(&config.storage_mountpoint)? / GB) as usize,
         };
 
         // Nodes registry
@@ -888,7 +888,7 @@ impl Component for Status<'_> {
                     debug!("Got action to Add node");
 
                     // Validations - Available space
-                    if GB_PER_NODE > self.available_disk_space_gb {
+                    if (GB_PER_NODE as usize) > self.available_disk_space_gb {
                         self.error_popup = Some(ErrorPopup::new(
                         "Cannot Add Node".to_string(),
                         format!("\nEach Node requires {}GB of available space.", GB_PER_NODE),
@@ -1068,7 +1068,7 @@ impl Component for Status<'_> {
             }
             Action::OptionsActions(OptionsActions::UpdateStorageDrive(mountpoint, _drive_name)) => {
                 self.storage_mountpoint.clone_from(&mountpoint);
-                self.available_disk_space_gb = get_available_space_b(&mountpoint)? / GB;
+                self.available_disk_space_gb = (get_available_space_b(&mountpoint)? / GB) as usize;
             }
             _ => {}
         }
@@ -1117,7 +1117,7 @@ impl Component for Status<'_> {
 
         let storage_allocated_row = Row::new(vec![
             Cell::new("Storage Allocated".to_string()).fg(GHOST_WHITE),
-            Cell::new(format!("{} GB", self.nodes_to_start * GB_PER_NODE)).fg(GHOST_WHITE),
+            Cell::new(format!("{} GB", (self.nodes_to_start as u64) * GB_PER_NODE)).fg(GHOST_WHITE),
         ]);
         let memory_use_val = if self.node_stats.total_memory_usage_mb as f64 / 1024_f64 > 1.0 {
             format!(
