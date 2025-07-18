@@ -15,6 +15,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use super::Metadata;
+use crate::files::normalize_path;
 use crate::{
     client::{
         high_level::{data::DataAddress, files::RenameError},
@@ -23,8 +25,6 @@ use crate::{
     },
     Client,
 };
-
-use super::Metadata;
 
 /// The address of a public archive on the network. Points to an [`PublicArchive`].
 pub type ArchiveAddress = DataAddress;
@@ -78,8 +78,13 @@ impl PublicArchive {
     /// Add a file to a local archive
     /// Note that this does not upload the archive to the network
     pub fn add_file(&mut self, path: PathBuf, data_addr: DataAddress, meta: Metadata) {
-        self.map.insert(path.clone(), (data_addr, meta));
-        debug!("Added a new file to the archive, path: {:?}", path);
+        // Normalize the path to use forward slashes
+        let normalized_path = normalize_path(path.clone());
+        self.map.insert(normalized_path.clone(), (data_addr, meta));
+        debug!(
+            "Added a new file to the archive, path: {:?}",
+            normalized_path
+        );
     }
 
     /// List all files in the archive
@@ -212,10 +217,9 @@ impl Client {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use std::str::FromStr;
     use xor_name::XorName;
-
-    use super::*;
 
     #[test]
     fn compatibility() {

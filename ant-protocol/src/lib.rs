@@ -9,12 +9,12 @@
 #[macro_use]
 extern crate tracing;
 
+/// Constants
+pub mod constants;
 /// Errors.
 pub mod error;
 /// Messages types
 pub mod messages;
-/// Helpers for antnode
-pub mod node;
 /// RPC commands to node
 pub mod node_rpc;
 /// Storage types for GraphEntry and Chunk
@@ -48,12 +48,7 @@ use std::{
 };
 use xor_name::XorName;
 
-/// The maximum number of peers to return in a `GetClosestPeers` response.
-/// This is the group size used in safe network protocol to be responsible for
-/// an item in the network.
-/// The peer should be present among the CLOSE_GROUP_SIZE if we're fetching the close_group(peer)
-/// The size has been set to 5 for improved performance.
-pub const CLOSE_GROUP_SIZE: usize = 5;
+pub use constants::CLOSE_GROUP_SIZE;
 
 /// Returns the UDP port from the provided MultiAddr.
 pub fn get_port_from_multiaddr(multi_addr: &Multiaddr) -> Option<u16> {
@@ -388,8 +383,12 @@ impl std::fmt::Debug for PrettyPrintRecordKey<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::storage::GraphEntryAddress;
-    use crate::NetworkAddress;
+    use crate::{
+        messages::{Nonce, Query},
+        storage::GraphEntryAddress,
+        NetworkAddress, PeerId,
+    };
+    use serde::{Deserialize, Serialize};
 
     #[test]
     fn verify_graph_entry_addr_is_actionable() {
@@ -399,9 +398,126 @@ mod tests {
 
         let graph_entry_addr_hex = &graph_entry_addr.to_hex();
         let net_addr_fmt = format!("{net_addr}");
-        let net_addr_dbg = format!("{net_addr:?}");
 
         assert!(net_addr_fmt.contains(graph_entry_addr_hex));
-        assert!(net_addr_dbg.contains(graph_entry_addr_hex));
+    }
+
+    #[derive(Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
+    enum QueryExtended {
+        GetStoreQuote {
+            key: NetworkAddress,
+            data_type: u32,
+            data_size: usize,
+            nonce: Option<Nonce>,
+            difficulty: usize,
+        },
+        GetReplicatedRecord {
+            requester: NetworkAddress,
+            key: NetworkAddress,
+        },
+        GetChunkExistenceProof {
+            key: NetworkAddress,
+            nonce: Nonce,
+            difficulty: usize,
+        },
+        CheckNodeInProblem(NetworkAddress),
+        GetClosestPeers {
+            key: NetworkAddress,
+            num_of_peers: Option<usize>,
+            range: Option<[u8; 32]>,
+            sign_result: bool,
+        },
+        GetVersion(NetworkAddress),
+        AdditionalVariant(NetworkAddress), // New variant for extended functionality
+    }
+
+    #[test]
+    fn test_query_serialization_deserialization() {
+        let peer_id = PeerId::random();
+        // Create a sample Query message
+        let original_query = Query::GetStoreQuote {
+            key: NetworkAddress::from(peer_id),
+            data_type: 1,
+            data_size: 100,
+            nonce: Some(0),
+            difficulty: 3,
+        };
+
+        // Serialize to bytes
+        let serialized = bincode::serialize(&original_query).expect("Serialization failed");
+
+        // Deserialize into QueryExtended
+        let deserialized: QueryExtended =
+            bincode::deserialize(&serialized).expect("Deserialization into QueryExtended failed");
+
+        // Verify the deserialized data matches the original
+        match deserialized {
+            QueryExtended::GetStoreQuote {
+                key,
+                data_type,
+                data_size,
+                nonce,
+                difficulty,
+            } => {
+                assert_eq!(key, NetworkAddress::from(peer_id));
+                assert_eq!(data_type, 1);
+                assert_eq!(data_size, 100);
+                assert_eq!(nonce, Some(0));
+                assert_eq!(difficulty, 3);
+            }
+            _ => panic!("Deserialized into wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_query_extended_serialization() {
+        // Create a sample QueryExtended message with extended new variant
+        let extended_query =
+            QueryExtended::AdditionalVariant(NetworkAddress::from(PeerId::random()));
+
+        // Serialize to bytes
+        let serialized = bincode::serialize(&extended_query).expect("Serialization failed");
+
+        // Attempt to deserialize into original Query (should fail)
+        let result: Result<Query, _> = bincode::deserialize(&serialized);
+        assert!(
+            result.is_err(),
+            "Should fail to deserialize extended enum into original"
+        );
+
+        let peer_id = PeerId::random();
+        // Create a sample QueryExtended message with old variant
+        let extended_query = QueryExtended::GetStoreQuote {
+            key: NetworkAddress::from(peer_id),
+            data_type: 1,
+            data_size: 100,
+            nonce: Some(0),
+            difficulty: 3,
+        };
+
+        // Serialize to bytes
+        let serialized = bincode::serialize(&extended_query).expect("Serialization failed");
+
+        // Deserialize into Query
+        let deserialized: Query =
+            bincode::deserialize(&serialized).expect("Deserialization into Query failed");
+
+        // Verify the deserialized data matches the original
+        match deserialized {
+            Query::GetStoreQuote {
+                key,
+                data_type,
+                data_size,
+                nonce,
+                difficulty,
+            } => {
+                assert_eq!(key, NetworkAddress::from(peer_id));
+                assert_eq!(data_type, 1);
+                assert_eq!(data_size, 100);
+                assert_eq!(nonce, Some(0));
+                assert_eq!(difficulty, 3);
+            }
+            _ => panic!("Deserialized into wrong variant"),
+        }
     }
 }

@@ -32,11 +32,20 @@ pub enum RetryStrategy {
     Balanced = 6,
     /// Try 10 times (waits 2s, 4s, 8s, 8s, 8s, 8s, 8s, 8s, 8s; max total sleep time ~62s)
     Persistent = 10,
+    /// Try N times
+    N(usize),
 }
 
 impl RetryStrategy {
     pub fn attempts(&self) -> usize {
-        *self as usize
+        match self {
+            RetryStrategy::N(n) => *n,
+            RetryStrategy::None => 1,
+            RetryStrategy::Once => 2,
+            RetryStrategy::Quick => 4,
+            RetryStrategy::Balanced => 6,
+            RetryStrategy::Persistent => 10,
+        }
     }
 
     pub fn backoff(&self) -> Backoff {

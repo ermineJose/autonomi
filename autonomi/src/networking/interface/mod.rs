@@ -9,7 +9,6 @@
 use crate::networking::OneShotTaskResult;
 use ant_evm::PaymentQuote;
 use ant_protocol::NetworkAddress;
-use libp2p::kad::QueryId;
 use libp2p::{
     kad::{PeerInfo, Quorum, Record},
     PeerId,
@@ -41,13 +40,21 @@ pub(super) enum NetworkTask {
         #[debug(skip)]
         resp: OneShotTaskResult<(Option<Record>, Vec<PeerId>)>,
     },
-    /// cf [`crate::driver::task_handler::TaskHandler::update_put_record`]
-    PutRecord {
+    /// cf [`crate::driver::task_handler::TaskHandler::update_put_record_kad`]
+    PutRecordKad {
         #[debug(skip)]
         record: Record,
         /// Empty vec results in regular store to peers closest to record address
         to: Vec<PeerInfo>,
         quorum: Quorum,
+        #[debug(skip)]
+        resp: OneShotTaskResult<()>,
+    },
+    /// cf [`crate::driver::task_handler::TaskHandler::update_put_record_kad_req`]
+    PutRecordReq {
+        #[debug(skip)]
+        record: Record,
+        to: PeerInfo,
         #[debug(skip)]
         resp: OneShotTaskResult<()>,
     },
@@ -60,11 +67,4 @@ pub(super) enum NetworkTask {
         #[debug(skip)]
         resp: OneShotTaskResult<Option<(PeerInfo, PaymentQuote)>>,
     },
-}
-
-/// Commands that can be sent to the network driver to control ongoing operations.
-#[derive(Debug)]
-pub(super) enum Command {
-    /// Terminate an ongoing query.
-    TerminateQuery(QueryId),
 }

@@ -48,11 +48,18 @@ pub async fn upload(
     no_archive: bool,
     network_context: NetworkContext,
     max_fee_per_gas_param: Option<MaxFeePerGasParam>,
+    retry_failed: u64,
 ) -> Result<(), ExitCodeError> {
     let config = ClientOperatingStrategy::new();
 
     let mut client =
         crate::actions::connect_to_network_with_config(network_context, config).await?;
+
+    // Configure client with retry_failed setting
+    if retry_failed != 0 {
+        client = client.with_retry_failed(retry_failed);
+        println!("🔄 Retry mode enabled - will retry failed chunks until successful or exceeds the limit.");
+    }
 
     let mut wallet = load_wallet(client.evm_network()).map_err(|err| (err, IO_ERROR))?;
 
@@ -217,10 +224,14 @@ pub async fn download(
     dest_path: &str,
     network_context: NetworkContext,
     quorum: Option<Quorum>,
+    retries: Option<usize>,
 ) -> Result<(), ExitCodeError> {
     let mut config = ClientOperatingStrategy::new();
     if let Some(quorum) = quorum {
         config.chunks.get_quorum = quorum;
+    }
+    if let Some(retries) = retries {
+        config.chunks.get_retry = RetryStrategy::N(retries);
     }
     let client = crate::actions::connect_to_network_with_config(network_context, config).await?;
     crate::actions::download(addr, dest_path, &client).await

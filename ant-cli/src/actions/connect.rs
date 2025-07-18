@@ -37,7 +37,9 @@ pub async fn connect_to_network_with_config(
     network_context: NetworkContext,
     operating_strategy: ClientOperatingStrategy,
 ) -> Result<Client, ExitCodeError> {
-    let progress_bar = ProgressBar::new_spinner();
+    // TODO: got the progress_bar display after correct the ticking advance steps.
+    // let progress_bar = ProgressBar::new_spinner();
+    let progress_bar = ProgressBar::hidden();
     progress_bar.enable_steady_tick(Duration::from_millis(120));
     progress_bar.set_message("Connecting to the Autonomi network...");
     let new_style = progress_bar.style().tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈🔗");
@@ -45,18 +47,22 @@ pub async fn connect_to_network_with_config(
 
     let res = match network_context.network_id.as_u8() {
         LOCAL_NETWORK_ID => {
+            println!("Connecting to a local Autonomi network...");
             progress_bar.set_message("Connecting to a local Autonomi network...");
             Client::init_local().await
         }
         MAIN_NETWORK_ID => {
+            println!("Connecting to the Autonomi network...");
             progress_bar.set_message("Connecting to the Autonomi network...");
             Client::init().await
         }
         ALPHA_NETWORK_ID => {
+            println!("Connecting to the alpha Autonomi network...");
             progress_bar.set_message("Connecting to the alpha Autonomi network...");
             Client::init_alpha().await
         }
         _ => {
+            println!("Connecting to a custom Autonomi network...");
             progress_bar.set_message("Connecting to a custom Autonomi network...");
             let evm_network = get_evm_network(
                 network_context.peers.local,
@@ -80,20 +86,16 @@ pub async fn connect_to_network_with_config(
 
     match res {
         Ok(client) => {
+            println!("Connected to the network");
             info!("Connected to the network");
-            progress_bar.finish_with_message(format!(
-                "Connected to the {:?} network",
-                network_context.network_id
-            ));
+            progress_bar.finish_with_message("Connected to the network".to_string());
             let client = client.with_strategy(operating_strategy);
             Ok(client)
         }
         Err(e) => {
+            println!("Failed to connect to the network: {e}");
             error!("Failed to connect to the network: {e}");
-            progress_bar.finish_with_message(format!(
-                "Failed to connect to the {:?} network",
-                network_context.network_id
-            ));
+            progress_bar.finish_with_message("Failed to connect to the network".to_string());
             let exit_code = connect_error_exit_code(&e);
             Err((
                 eyre!(e).wrap_err("Failed to connect to the network"),

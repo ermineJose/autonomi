@@ -2,7 +2,7 @@
 authors = ["MaidSafe Developers <dev@maidsafe.net>"]
 description = "The Autonomi node binary"
 name = "ant-node"
-version = "0.4.1-rc.1"
+version = "0.4.2"
 edition = "2021"
 license = "GPL-3.0"
 homepage = "https://maidsafe.net"
@@ -16,19 +16,19 @@ path = "src/bin/antnode/main.rs"
 [features]
 default = ["open-metrics"]
 extension-module = ["pyo3/extension-module", "pyo3-async-runtimes"]
-loud = ["ant-networking/loud"] # loud mode: print important messages to console
+loud = [] # loud mode: print important messages to console
 nightly = []
-open-metrics = ["ant-networking/open-metrics", "prometheus-client"]
+open-metrics = ["libp2p/metrics", "prometheus-client", "hyper", "sysinfo"]
 otlp = ["ant-logging/otlp"]
 
 [dependencies]
-ant-bootstrap = { path = "../ant-bootstrap", version = "0.2.4-rc.1" }
-ant-build-info = { path = "../ant-build-info", version = "0.1.28-rc.1" }
-ant-evm = { path = "../ant-evm", version = "0.1.15-rc.1" }
-ant-logging = { path = "../ant-logging", version = "0.2.50-rc.1", features = ["process-metrics"] }
-ant-networking = { path = "../ant-networking", version = "0.3.13-rc.1" }
-ant-protocol = { path = "../ant-protocol", version = "1.0.6-rc.1" }
-ant-service-management = { path = "../ant-service-management", version = "0.4.14-rc.1" }
+aes-gcm-siv = "0.11.1"
+ant-bootstrap = { path = "../ant-bootstrap", version = "0.2.5" }
+ant-build-info = { path = "../ant-build-info", version = "0.1.29" }
+ant-evm = { path = "../ant-evm", version = "0.1.16" }
+ant-logging = { path = "../ant-logging", version = "0.2.51", features = ["process-metrics"] }
+ant-protocol = { path = "../ant-protocol", version = "1.0.7" }
+ant-service-management = { path = "../ant-service-management", version = "0.4.15" }
 async-trait = "0.1"
 bls = { package = "blsttc", version = "8.0.1" }
 bytes = { version = "1.0.1", features = ["serde"] }
@@ -43,10 +43,32 @@ eyre = "0.6.8"
 file-rotate = "0.7.3"
 futures = "~0.3.13"
 hex = "~0.4.3"
+hkdf = "0.12"
+hyper = { version = "0.14", features = [
+    "server",
+    "tcp",
+    "http1",
+], optional = true }
 itertools = "~0.12.1"
-libp2p = { version = "0.55.0", features = ["tokio", "dns", "kad", "macros"] }
+libp2p = { version = "0.56.0", features = [
+    "tokio",
+    "dns",
+    "upnp",
+    "kad",
+    "macros",
+    "request-response",
+    "cbor",
+    "identify",
+    "quic",
+    "relay",
+    "noise",
+    "tcp",
+    "yamux",
+    "websocket",
+    "autonat",
+] }
 num-traits = "0.2"
-prometheus-client = { version = "0.22", optional = true }
+prometheus-client = { version = "0.23.1", optional = true }
 # watch out updating this, protoc compiler needs to be installed on all build systems
 # arm builds + musl are very problematic
 prost = { version = "0.9" }
@@ -55,9 +77,11 @@ pyo3-async-runtimes = { version = "0.23", features = ["tokio-runtime"], optional
 rand = { version = "~0.8.5", features = ["small_rng"] }
 rmp-serde = "1.1.1"
 rayon = "1.8.0"
+sha2 = "0.10"
 self_encryption = "~0.30.0"
 serde = { version = "1.0.133", features = ["derive", "rc"] }
 strum = { version = "0.26.2", features = ["derive"] }
+sysinfo = { version = "0.30.8", default-features = false, optional = true }
 thiserror = "1.0.23"
 tokio = { version = "1.43.1", features = [
     "io-util",
@@ -76,12 +100,13 @@ tracing-opentelemetry = { version = "0.21", optional = true }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 walkdir = "~2.5.0"
 xor_name = "5.0.0"
+void = "1.0.2"
 
 [dev-dependencies]
-ant-protocol = { path = "../ant-protocol", version = "1.0.6-rc.1", features = ["rpc"] }
+ant-protocol = { path = "../ant-protocol", version = "1.0.7", features = ["rpc"] }
 assert_fs = "1.0.0"
-evmlib = { path = "../evmlib", version = "0.4.1-rc.1" }
-autonomi = { path = "../autonomi", version = "0.5.0-rc.1" }
+evmlib = { path = "../evmlib", version = "0.4.2" }
+autonomi = { path = "../autonomi", version = "0.5.1" }
 reqwest = { version = "0.12.2", default-features = false, features = [
     "rustls-tls-manual-roots",
 ] }
@@ -90,6 +115,9 @@ tempfile = "3.6.0"
 # Do not specify the version field. Release process expects even the local dev deps to be published.
 # Removing the version field is a workaround.
 test-utils = { path = "../test-utils" }
+uuid = { version = "1.5.0", features = ["v4"] }
+libp2p-swarm-test = { version = "0.6.0", features = ["tokio"] }
+quickcheck = "1.0.3"
 
 [lints]
 workspace = true

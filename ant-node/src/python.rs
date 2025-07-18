@@ -3,10 +3,11 @@ use crate::{
         network_spawner::{NetworkSpawner, RunningNetwork},
         node_spawner::NodeSpawner,
     },
+    utils::get_antnode_root_dir,
     NodeBuilder, RunningNode,
 };
 use ant_evm::{EvmNetwork, RewardsAddress};
-use ant_protocol::{node::get_antnode_root_dir, storage::ChunkAddress, NetworkAddress};
+use ant_protocol::{storage::ChunkAddress, NetworkAddress};
 use const_hex::FromHex;
 use libp2p::{
     identity::{Keypair, PeerId},

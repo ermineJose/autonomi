@@ -90,11 +90,16 @@ impl NetworkDriver {
             QueryResult::GetRecord(res) => {
                 // The result here is not logged because it can produce megabytes of text.
                 trace!("GetRecord event occurred");
-                self.pending_tasks.update_get_record(id, res)?;
+                let finished = self.pending_tasks.update_get_record(id, res)?;
+                if finished {
+                    if let Some(mut query) = self.kad().query_mut(&id) {
+                        query.finish();
+                    }
+                }
             }
             QueryResult::PutRecord(res) => {
                 trace!("PutRecord: {:?}", res);
-                self.pending_tasks.update_put_record(id, res)?;
+                self.pending_tasks.update_put_record_kad(id, res)?;
             }
             QueryResult::GetProviders(res) => {
                 trace!("GetProviders: {:?}", res);
@@ -120,14 +125,24 @@ impl NetworkDriver {
             return Ok(());
         }
 
-        if let Response::Query(QueryResponse::GetStoreQuote {
-            quote,
-            peer_address,
-            storage_proofs: _,
-        }) = response
-        {
-            self.pending_tasks
-                .update_get_quote(request_id, quote, peer_address)?;
+        match response {
+            Response::Query(QueryResponse::GetStoreQuote {
+                quote,
+                peer_address,
+                storage_proofs: _,
+            }) => {
+                self.pending_tasks
+                    .update_get_quote(request_id, quote, peer_address)?;
+            }
+            Response::Query(QueryResponse::PutRecord {
+                result,
+                peer_address: _,
+                record_addr: _,
+            }) => {
+                self.pending_tasks
+                    .update_put_record_req(request_id, result)?;
+            }
+            _ => {}
         }
 
         Ok(())
@@ -148,7 +163,7 @@ impl NetworkDriver {
         }
 
         self.pending_tasks
-            .terminate_get_quote(request_id, peer, error)?;
+            .terminate_query(request_id, peer, error)?;
 
         Ok(())
     }

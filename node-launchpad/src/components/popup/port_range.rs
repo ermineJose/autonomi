@@ -148,7 +148,7 @@ impl PortRangePopUp {
                 Style::default().fg(LIGHT_PERIWINKLE),
             )),
             Line::from(Span::styled(
-                format!("This must be between {} and {}.", PORT_MIN, PORT_MAX),
+                format!("This must be between {PORT_MIN} and {PORT_MAX}."),
                 Style::default().fg(if self.can_save { LIGHT_PERIWINKLE } else { RED }),
             )),
         ])

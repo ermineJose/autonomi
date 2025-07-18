@@ -6,13 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::Marker;
-use ant_networking::time::Instant;
 #[cfg(feature = "open-metrics")]
-use ant_networking::MetricsRegistries;
+use crate::networking::MetricsRegistries;
+use crate::Marker;
 use ant_protocol::storage::DataTypes;
 use prometheus_client::{
-    encoding::EncodeLabelSet,
+    encoding::{EncodeLabelSet, EncodeLabelValue},
     metrics::{
         counter::Counter,
         family::Family,
@@ -21,6 +20,7 @@ use prometheus_client::{
         info::Info,
     },
 };
+use std::time::Instant;
 
 #[derive(Clone)]
 /// The shared recorders that are used to record metrics.
@@ -28,6 +28,7 @@ pub(crate) struct NodeMetricsRecorder {
     /// put record
     put_record_ok: Family<PutRecordOk, Counter>,
     put_record_err: Counter,
+    put_record_err_v2: Family<PutRecordErr, Counter>,
 
     /// replication
     replication_triggered: Counter,
@@ -44,11 +45,6 @@ pub(crate) struct NodeMetricsRecorder {
     // to track the uptime of the node.
     pub(crate) started_instant: Instant,
     pub(crate) uptime: Gauge,
-}
-
-#[derive(EncodeLabelSet, Hash, Clone, Eq, PartialEq, Debug)]
-struct PutRecordOk {
-    record_type: DataTypes,
 }
 
 impl NodeMetricsRecorder {
@@ -73,11 +69,18 @@ impl NodeMetricsRecorder {
             "Number of successful record PUTs",
             put_record_ok.clone(),
         );
+
         let put_record_err = Counter::default();
         sub_registry.register(
             "put_record_err",
             "Number of errors during record PUTs",
             put_record_err.clone(),
+        );
+        let put_record_err_v2 = Family::default();
+        sub_registry.register(
+            "put_record_err_v2",
+            "Number of errors during record PUTs",
+            put_record_err_v2.clone(),
         );
 
         let replication_triggered = Counter::default();
@@ -133,6 +136,7 @@ impl NodeMetricsRecorder {
         Self {
             put_record_ok,
             put_record_err,
+            put_record_err_v2,
             replication_triggered,
             replication_keys_to_fetch,
             peer_added_to_routing_table,
@@ -165,7 +169,13 @@ impl NodeMetricsRecorder {
                     .inc();
             }
 
-            Marker::RecordRejected(_, _) => {
+            Marker::RecordRejected(_, error) => {
+                let _ = self
+                    .put_record_err_v2
+                    .get_or_create(&PutRecordErr {
+                        error_type: PutRecordErrorType::from(error),
+                    })
+                    .inc();
                 let _ = self.put_record_err.inc();
             }
 
@@ -186,6 +196,73 @@ impl NodeMetricsRecorder {
             }
 
             _ => {}
+        }
+    }
+}
+
+#[derive(EncodeLabelSet, Hash, Clone, Eq, PartialEq, Debug)]
+struct PutRecordOk {
+    record_type: DataTypes,
+}
+
+#[derive(EncodeLabelSet, Hash, Clone, Eq, PartialEq, Debug)]
+struct PutRecordErr {
+    error_type: PutRecordErrorType,
+}
+
+#[derive(EncodeLabelValue, Hash, Clone, Eq, PartialEq, Debug)]
+enum PutRecordErrorType {
+    RecordKeyMismatch,
+    RecordSerializationFailed,
+    NoPayment,
+    UnexpectedRecordWithPayment,
+    PaymentNotMadeToOurNode,
+    PaymentMadeToIncorrectDataType,
+    PaymentQuoteOutOfRange,
+    PaymentVerificationFailed,
+    OversizedChunk,
+    OutdatedRecordCounter,
+    InvalidScratchpadSignature,
+    ScratchpadTooBig,
+    EmptyGraphEntry,
+    InvalidPointerSignature,
+    LocalSwarmError,
+    InvalidRecordHeader,
+    InvalidRecord,
+}
+
+impl From<&crate::PutValidationError> for PutRecordErrorType {
+    fn from(error: &crate::PutValidationError) -> Self {
+        match error {
+            crate::PutValidationError::RecordKeyMismatch => Self::RecordKeyMismatch,
+            crate::PutValidationError::RecordSerializationFailed(_) => {
+                Self::RecordSerializationFailed
+            }
+            crate::PutValidationError::NoPayment(_) => Self::NoPayment,
+            crate::PutValidationError::UnexpectedRecordWithPayment(_) => {
+                Self::UnexpectedRecordWithPayment
+            }
+            crate::PutValidationError::PaymentNotMadeToOurNode(_) => Self::PaymentNotMadeToOurNode,
+            crate::PutValidationError::PaymentMadeToIncorrectDataType(_) => {
+                Self::PaymentMadeToIncorrectDataType
+            }
+            crate::PutValidationError::PaymentQuoteOutOfRange { .. } => {
+                Self::PaymentQuoteOutOfRange
+            }
+            crate::PutValidationError::PaymentVerificationFailed { .. } => {
+                Self::PaymentVerificationFailed
+            }
+            crate::PutValidationError::OversizedChunk(_, _) => Self::OversizedChunk,
+            crate::PutValidationError::OutdatedRecordCounter { .. } => Self::OutdatedRecordCounter,
+            crate::PutValidationError::InvalidScratchpadSignature => {
+                Self::InvalidScratchpadSignature
+            }
+            crate::PutValidationError::ScratchpadTooBig(_) => Self::ScratchpadTooBig,
+            crate::PutValidationError::EmptyGraphEntry(_) => Self::EmptyGraphEntry,
+            crate::PutValidationError::InvalidPointerSignature => Self::InvalidPointerSignature,
+            crate::PutValidationError::LocalSwarmError => Self::LocalSwarmError,
+            crate::PutValidationError::InvalidRecordHeader => Self::InvalidRecordHeader,
+            crate::PutValidationError::InvalidRecord(_) => Self::InvalidRecord,
         }
     }
 }

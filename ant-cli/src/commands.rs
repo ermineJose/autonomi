@@ -93,6 +93,11 @@ pub enum FileCmd {
         /// Note: This option only affects directory uploads - single file uploads never create archives.
         #[arg(long)]
         no_archive: bool,
+        /// Retry failed uploads automatically after 1 minute pause.
+        /// This will persistently retry any failed chunks until all data is successfully uploaded.
+        #[arg(long)]
+        #[clap(default_value = "0")]
+        retry_failed: u64,
         #[command(flatten)]
         transaction_opt: TransactionOpt,
     },
@@ -108,6 +113,9 @@ pub enum FileCmd {
         /// Possible values are: "one", "majority", "all", n (where n is a number greater than 0)
         #[arg(short, long, value_parser = parse_quorum)]
         quorum: Option<Quorum>,
+        /// Experimental: Optionally specify the number of retries for the download.
+        #[arg(short, long)]
+        retries: Option<usize>,
     },
 
     /// List previous uploads
@@ -421,6 +429,7 @@ pub async fn handle_subcommand(opt: Opt) -> Result<()> {
                 file,
                 public,
                 no_archive,
+                retry_failed,
                 transaction_opt,
             } => {
                 if let Err((err, exit_code)) = file::upload(
@@ -429,6 +438,7 @@ pub async fn handle_subcommand(opt: Opt) -> Result<()> {
                     no_archive,
                     network_context,
                     transaction_opt.max_fee_per_gas,
+                    retry_failed,
                 )
                 .await
                 {
@@ -442,9 +452,10 @@ pub async fn handle_subcommand(opt: Opt) -> Result<()> {
                 addr,
                 dest_file,
                 quorum,
+                retries,
             } => {
                 if let Err((err, exit_code)) =
-                    file::download(&addr, &dest_file, network_context, quorum).await
+                    file::download(&addr, &dest_file, network_context, quorum, retries).await
                 {
                     eprintln!("{err:?}");
                     std::process::exit(exit_code);

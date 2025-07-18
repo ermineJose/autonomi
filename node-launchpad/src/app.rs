@@ -252,7 +252,7 @@ impl App {
                                 let r = component.draw(f, f.area());
                                 if let Err(e) = r {
                                     action_tx
-                                        .send(Action::Error(format!("Failed to draw: {:?}", e)))
+                                        .send(Action::Error(format!("Failed to draw: {e:?}")))
                                         .unwrap();
                                 }
                             }
@@ -268,7 +268,7 @@ impl App {
                                 let r = component.draw(f, f.area());
                                 if let Err(e) = r {
                                     action_tx
-                                        .send(Action::Error(format!("Failed to draw: {:?}", e)))
+                                        .send(Action::Error(format!("Failed to draw: {e:?}")))
                                         .unwrap();
                                 }
                             }
@@ -395,7 +395,7 @@ mod tests {
                 write!(output, "App created successfully with valid configuration")?;
             }
             Err(e) => {
-                write!(output, "App creation failed: {}", e)?;
+                write!(output, "App creation failed: {e}")?;
             }
         }
 
@@ -405,8 +405,7 @@ mod tests {
         // Check if the success message is in the output
         assert!(
             output_str.contains("App created successfully with valid configuration"),
-            "Unexpected output: {}",
-            output_str
+            "Unexpected output: {output_str}"
         );
 
         Ok(())
@@ -470,7 +469,7 @@ mod tests {
                 )?;
             }
             Err(e) => {
-                write!(output, "App creation failed: {}", e)?;
+                write!(output, "App creation failed: {e}")?;
             }
         }
 
@@ -480,8 +479,7 @@ mod tests {
         // Check if the success message is in the output
         assert!(
             output_str.contains("App created successfully with partial configuration"),
-            "Unexpected output: {}",
-            output_str
+            "Unexpected output: {output_str}"
         );
 
         Ok(())
@@ -529,7 +527,7 @@ mod tests {
                 )?;
             }
             Err(e) => {
-                write!(output, "App creation failed: {}", e)?;
+                write!(output, "App creation failed: {e}")?;
             }
         }
 
@@ -539,8 +537,7 @@ mod tests {
         // Check if the success message is in the output
         assert!(
             output_str.contains("App created successfully with default configuration"),
-            "Unexpected output: {}",
-            output_str
+            "Unexpected output: {output_str}"
         );
 
         Ok(())
@@ -584,8 +581,7 @@ mod tests {
                     e.to_string().contains(
                         "Cannot find the primary disk. Configuration file might be wrong."
                     ) || e.to_string().contains("Failed to create nodes data dir in"),
-                    "Unexpected error message: {}",
-                    e
+                    "Unexpected error message: {e}"
                 );
             }
         }
@@ -641,7 +637,7 @@ mod tests {
                 println!("App created successfully with default connection mode and ports");
             }
             Err(e) => {
-                panic!("App creation failed: {}", e);
+                panic!("App creation failed: {e}");
             }
         }
 

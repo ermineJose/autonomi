@@ -10,8 +10,10 @@ use color_eyre::eyre::Result;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
-pub fn get_progress_bar(length: u64) -> Result<ProgressBar> {
-    let progress_bar = ProgressBar::new(length);
+pub fn get_progress_bar(_length: u64) -> Result<ProgressBar> {
+    // TODO: got the progress_bar display after correct the ticking advance steps.
+    // let progress_bar = ProgressBar::new(length);
+    let progress_bar = ProgressBar::hidden();
     progress_bar.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")?

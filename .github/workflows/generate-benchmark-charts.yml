@@ -55,7 +55,6 @@ jobs:
           action: start
           enable-evm-testnet: true
           node-path: target/release/antnode
-          platform: ubuntu-latest
           build: true
           sn-log: "all"
 
@@ -113,8 +112,7 @@ jobs:
         uses: maidsafe/ant-local-testnet-action@main
         with:
           action: stop
-          platform: ubuntu-latest
-          log_file_prefix: safe_test_logs_generate_bench_charts
+          log_file_prefix: ant_test_logs_generate_bench_charts
           build: true
 
       #########################

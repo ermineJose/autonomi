@@ -13,6 +13,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use super::Metadata;
+use crate::files::normalize_path;
 use crate::{
     client::{
         data_types::chunk::DataMapChunk, high_level::files::RenameError, payment::PaymentOption,
@@ -22,8 +24,6 @@ use crate::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-
-use super::Metadata;
 
 /// Private archive data map, allowing access to the [`PrivateArchive`] data.
 pub type PrivateArchiveDataMap = DataMapChunk;
@@ -77,8 +77,13 @@ impl PrivateArchive {
 
     /// Add a file to a local archive. Note that this does not upload the archive to the network.
     pub fn add_file(&mut self, path: PathBuf, data_map: DataMapChunk, meta: Metadata) {
-        self.map.insert(path.clone(), (data_map, meta));
-        debug!("Added a new file to the archive, path: {:?}", path);
+        // Normalize the path to use forward slashes
+        let normalized_path = normalize_path(path.clone());
+        self.map.insert(normalized_path.clone(), (data_map, meta));
+        debug!(
+            "Added a new file to the archive, path: {:?}",
+            normalized_path
+        );
     }
 
     /// List all files in the archive

@@ -11,16 +11,13 @@ use super::{
 };
 #[cfg(feature = "open-metrics")]
 use crate::metrics::NodeMetricsRecorder;
-use crate::RunningNode;
+#[cfg(feature = "open-metrics")]
+use crate::networking::MetricsRegistries;
+use crate::networking::{Addresses, Network, NetworkConfig, NetworkError, NetworkEvent, NodeIssue};
+use crate::{PutValidationError, RunningNode};
 use ant_bootstrap::BootstrapCacheStore;
 use ant_evm::EvmNetwork;
 use ant_evm::RewardsAddress;
-use ant_networking::Addresses;
-#[cfg(feature = "open-metrics")]
-use ant_networking::MetricsRegistries;
-use ant_networking::{
-    Instant, Network, NetworkBuilder, NetworkError, NetworkEvent, NodeIssue, SwarmDriver,
-};
 use ant_protocol::{
     error::Error as ProtocolError,
     messages::{ChunkProof, CmdResponse, Nonce, Query, QueryResponse, Request, Response},
@@ -29,7 +26,12 @@ use ant_protocol::{
 };
 use bytes::Bytes;
 use itertools::Itertools;
-use libp2p::{identity::Keypair, kad::U256, request_response::OutboundFailure, Multiaddr, PeerId};
+use libp2p::{
+    identity::Keypair,
+    kad::{Record, U256},
+    request_response::OutboundFailure,
+    Multiaddr, PeerId,
+};
 use num_traits::cast::ToPrimitive;
 use rand::{
     rngs::{OsRng, StdRng},
@@ -43,7 +45,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::watch;
 use tokio::{
@@ -157,39 +159,44 @@ impl NodeBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an error if there is a problem initializing the `SwarmDriver`.
+    /// Returns an error if there is a problem initializing the Network.
     pub fn build_and_run(self) -> Result<RunningNode> {
-        let mut network_builder =
-            NetworkBuilder::new(self.identity_keypair, self.local, self.initial_peers);
-
+        // setup metrics
         #[cfg(feature = "open-metrics")]
-        let metrics_recorder = if self.metrics_server_port.is_some() {
+        let (metrics_recorder, metrics_registries) = if self.metrics_server_port.is_some() {
             // metadata registry
             let mut metrics_registries = MetricsRegistries::default();
             let metrics_recorder = NodeMetricsRecorder::new(&mut metrics_registries);
 
-            network_builder.metrics_registries(metrics_registries);
-
-            Some(metrics_recorder)
+            (Some(metrics_recorder), metrics_registries)
         } else {
-            None
+            (None, MetricsRegistries::default())
         };
 
-        network_builder.listen_addr(self.addr);
-        #[cfg(feature = "open-metrics")]
-        network_builder.metrics_server_port(self.metrics_server_port);
-        network_builder.relay_client(self.relay_client);
-        if let Some(cache) = self.bootstrap_cache {
-            network_builder.bootstrap_cache(cache);
-        }
+        // create a shutdown signal channel
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        network_builder.no_upnp(self.no_upnp);
+        // init network
+        let network_config = NetworkConfig {
+            keypair: self.identity_keypair,
+            local: self.local,
+            initial_contacts: self.initial_peers,
+            listen_addr: self.addr,
+            root_dir: self.root_dir.clone(),
+            shutdown_rx: shutdown_rx.clone(),
+            bootstrap_cache: self.bootstrap_cache,
+            no_upnp: self.no_upnp,
+            relay_client: self.relay_client,
+            custom_request_timeout: None,
+            #[cfg(feature = "open-metrics")]
+            metrics_registries,
+            #[cfg(feature = "open-metrics")]
+            metrics_server_port: self.metrics_server_port,
+        };
+        let (network, network_event_receiver) = Network::init(network_config)?;
 
-        let (network, network_event_receiver, swarm_driver) =
-            network_builder.build_node(self.root_dir.clone())?;
-
+        // init node
         let node_events_channel = NodeEventsChannel::default();
-
         let node = NodeInner {
             network: network.clone(),
             events_channel: node_events_channel.clone(),
@@ -198,17 +205,12 @@ impl NodeBuilder {
             metrics_recorder,
             evm_network: self.evm_network,
         };
-
         let node = Node {
             inner: Arc::new(node),
         };
 
-        // Create a shutdown signal channel
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
-
         // Run the node
-        node.run(swarm_driver, network_event_receiver, shutdown_rx);
-
+        node.run(network_event_receiver, shutdown_rx);
         let running_node = RunningNode {
             shutdown_sender: shutdown_tx,
             network,
@@ -267,11 +269,10 @@ impl Node {
         &self.inner.evm_network
     }
 
-    /// Runs a task for the provided `SwarmDriver` and spawns a task to process for `NetworkEvents`.
+    /// Spawns a task to process for `NetworkEvents`.
     /// Returns both tasks as JoinHandle<()>.
     fn run(
         self,
-        swarm_driver: SwarmDriver,
         mut network_event_receiver: Receiver<NetworkEvent>,
         mut shutdown_rx: watch::Receiver<bool>,
     ) {
@@ -279,7 +280,6 @@ impl Node {
 
         let peers_connected = Arc::new(AtomicUsize::new(0));
 
-        let _swarm_driver_task = spawn(swarm_driver.run(shutdown_rx.clone()));
         let _node_task = spawn(async move {
             // use a random activity timeout to ensure that the nodes do not sync when messages
             // are being transmitted.
@@ -481,11 +481,12 @@ impl Node {
             }
             NetworkEvent::QueryRequestReceived { query, channel } => {
                 event_header = "QueryRequestReceived";
-                let network = self.network().clone();
+                let node = self.clone();
                 let payment_address = *self.reward_address();
 
                 let _handle = spawn(async move {
-                    let res = Self::handle_query(&network, query, payment_address).await;
+                    let network = node.network().clone();
+                    let res = Self::handle_query(node, query, payment_address).await;
 
                     // Reducing non-mandatory logging
                     if let Response::Query(QueryResponse::GetVersion { .. }) = res {
@@ -594,11 +595,8 @@ impl Node {
         Ok(())
     }
 
-    async fn handle_query(
-        network: &Network,
-        query: Query,
-        payment_address: RewardsAddress,
-    ) -> Response {
+    async fn handle_query(node: Self, query: Query, payment_address: RewardsAddress) -> Response {
+        let network = node.network();
         let resp: QueryResponse = match query {
             Query::GetStoreQuote {
                 key,
@@ -716,6 +714,39 @@ impl Node {
                 peer: NetworkAddress::from(network.peer_id()),
                 version: ant_build_info::package_version(),
             },
+            Query::PutRecord {
+                holder,
+                address,
+                serialized_record,
+            } => {
+                let record = Record {
+                    key: address.to_record_key(),
+                    value: serialized_record,
+                    publisher: None,
+                    expires: None,
+                };
+
+                let key = PrettyPrintRecordKey::from(&record.key).into_owned();
+                let result = match node.validate_and_store_record(record).await {
+                    Ok(()) => Ok(()),
+                    Err(PutValidationError::OutdatedRecordCounter { counter, expected }) => {
+                        node.record_metrics(Marker::RecordRejected(
+                            &key,
+                            &PutValidationError::OutdatedRecordCounter { counter, expected },
+                        ));
+                        Err(ProtocolError::OutdatedRecordCounter { counter, expected })
+                    }
+                    Err(err) => {
+                        node.record_metrics(Marker::RecordRejected(&key, &err));
+                        Err(ProtocolError::PutRecordFailed(format!("{err:?}")))
+                    }
+                };
+                QueryResponse::PutRecord {
+                    result,
+                    peer_address: holder,
+                    record_addr: address,
+                }
+            }
         };
         Response::Query(resp)
     }

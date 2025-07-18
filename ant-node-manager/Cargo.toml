@@ -7,7 +7,7 @@ license = "GPL-3.0"
 name = "ant-node-manager"
 readme = "README.md"
 repository = "https://github.com/maidsafe/autonomi"
-version = "0.13.1-rc.1"
+version = "0.13.2"
 
 [[bin]]
 name = "antctl"
@@ -29,21 +29,21 @@ tcp = []
 websockets = []
 
 [dependencies]
-ant-bootstrap = { path = "../ant-bootstrap", version = "0.2.4-rc.1" }
-ant-build-info = { path = "../ant-build-info", version = "0.1.28-rc.1" }
-ant-evm = { path = "../ant-evm", version = "0.1.15-rc.1" }
-ant-logging = { path = "../ant-logging", version = "0.2.50-rc.1" }
-ant-protocol = { path = "../ant-protocol", version = "1.0.6-rc.1" }
+ant-bootstrap = { path = "../ant-bootstrap", version = "0.2.5" }
+ant-build-info = { path = "../ant-build-info", version = "0.1.29" }
+ant-evm = { path = "../ant-evm", version = "0.1.16" }
+ant-logging = { path = "../ant-logging", version = "0.2.51" }
+ant-protocol = { path = "../ant-protocol", version = "1.0.7" }
 ant-releases = { version = "0.4.1" }
-ant-service-management = { path = "../ant-service-management", version = "0.4.14-rc.1" }
+ant-service-management = { path = "../ant-service-management", version = "0.4.15" }
 chrono = "~0.4.19"
 clap = { version = "4.4.6", features = ["derive", "env"] }
 colored = "2.0.4"
 color-eyre = "0.6.3"
 dirs-next = "2.0.0"
 indicatif = { version = "0.17.5", features = ["tokio"] }
-libp2p = { version = "0.55.0", features = [] }
-libp2p-identity = { version = "0.2.7", features = ["rand"] }
+libp2p = { version = "0.56.0", features = [] }
+libp2p-identity = { version = "0.2.12", features = ["rand"] }
 prost = { version = "0.9" }
 rand = "0.8.5"
 semver = "1.0.20"

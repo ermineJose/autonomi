@@ -15,6 +15,8 @@ use tokio::time::sleep;
 
 impl Network {
     /// Put a record to the network with retries
+    ///
+    /// Will carry out network get after put success, to verify the existence of the record.
     pub async fn put_record_with_retries(
         &self,
         record: Record,
@@ -22,14 +24,17 @@ impl Network {
         strategy: &Strategy,
     ) -> Result<(), NetworkError> {
         let addr = PrettyPrintRecordKey::from(&record.key).into_owned();
-        let quorum = strategy.put_quorum;
         let mut errors = vec![];
         for duration in strategy.put_retry.backoff() {
-            match self.put_record(record.clone(), to.clone(), quorum).await {
-                // return success
+            match self
+                .put_record(record.clone(), to.clone(), strategy.put_quorum)
+                .await
+            {
+                // Exitence verification is no longer mandatory as req/rsp upload allows client
+                // collect storage result from nodes directly.
                 Ok(()) => return Ok(()),
                 // return fatal errors
-                Err(err) if err.is_fatal() => {
+                Err(err) if err.cannot_retry() => {
                     return Err(err);
                 }
                 // retry on other errors
@@ -63,7 +68,7 @@ impl Network {
                     return Err(err);
                 }
                 // return fatal errors
-                Err(err) if err.is_fatal() => {
+                Err(err) if err.cannot_retry() => {
                     return Err(err);
                 }
                 // retry on no record
@@ -101,7 +106,7 @@ impl Network {
                 // return success
                 Ok(quotes) => return Ok(quotes),
                 // return fatal errors
-                Err(err) if err.is_fatal() => {
+                Err(err) if err.cannot_retry() => {
                     return Err(err);
                 }
                 // retry on other errors
@@ -129,7 +134,7 @@ impl Network {
                 // return success
                 Ok(peers) => return Ok(peers),
                 // return fatal errors
-                Err(err) if err.is_fatal() => {
+                Err(err) if err.cannot_retry() => {
                     return Err(err);
                 }
                 // retry on other errors

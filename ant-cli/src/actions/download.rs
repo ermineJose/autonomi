@@ -223,12 +223,14 @@ async fn download_public_single_file(
     Ok(())
 }
 
+// The `addr` string here could be the entire datamap chunk hexed content.
 async fn download_from_datamap(
     addr: &str,
     datamap: DataMapChunk,
     dest_path: &str,
     client: &Client,
 ) -> Result<(), ExitCodeError> {
+    let datamap_addr = datamap.address();
     match client.analyze_address(&datamap.to_hex(), false).await {
         Ok(Analysis::RawDataMap { data, .. }) => {
             let path = PathBuf::from(dest_path);
@@ -236,20 +238,20 @@ async fn download_from_datamap(
             let parent = path.parent().unwrap_or_else(|| &here);
             std::fs::create_dir_all(parent).map_err(|err| (err.into(), IO_ERROR))?;
             std::fs::write(path, data).map_err(|err| (err.into(), IO_ERROR))?;
-            info!("Successfully downloaded file from datamap at: {addr}");
-            println!("Successfully downloaded file from datamap at: {addr}");
+            info!("Successfully downloaded file from datamap at: {datamap_addr}");
+            println!("Successfully downloaded file from datamap at: {datamap_addr}");
             Ok(())
         }
         Ok(Analysis::PublicArchive { archive, .. }) => {
-            info!("Detected public archive at: {addr}");
+            info!("Detected public archive at: {datamap_addr}");
             download_pub_archive_to_disk(addr, archive, dest_path, client).await
         }
         Ok(Analysis::PrivateArchive(private_archive)) => {
-            info!("Detected private archive at: {addr}");
+            info!("Detected private archive at: {datamap_addr}");
             download_priv_archive_to_disk(addr, private_archive, dest_path, client).await
         }
         Ok(a) => {
-            let err = format!("Unexpected data type found at {addr:?}: {a}");
+            let err = format!("Unexpected data type found at {datamap_addr}: {a}");
             Err((
                 eyre!(err).wrap_err("Failed to fetch file from address"),
                 INVALID_INPUT_EXIT_CODE,
@@ -258,7 +260,7 @@ async fn download_from_datamap(
         Err(e) => {
             let exit_code = exit_code::analysis_exit_code(&e);
             Err((
-                eyre!(e).wrap_err(format!("Failed to fetch file {addr:?}")),
+                eyre!(e).wrap_err(format!("Failed to fetch file at {datamap_addr}")),
                 exit_code,
             ))
         }

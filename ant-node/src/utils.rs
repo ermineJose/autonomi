@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use ant_protocol::node::get_antnode_root_dir;
 use eyre::eyre;
 use libp2p::identity::Keypair;
+use libp2p::PeerId;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -40,6 +40,16 @@ pub fn get_root_dir_and_keypair(root_dir: &Option<PathBuf>) -> eyre::Result<(Pat
             Ok((dir, keypair))
         }
     }
+}
+
+/// Get the default antnode root dir for the provided PeerId
+pub fn get_antnode_root_dir(peer_id: PeerId) -> eyre::Result<PathBuf> {
+    let dir = dirs_next::data_dir()
+        .ok_or_else(|| eyre!("could not obtain data dir"))?
+        .join("autonomi")
+        .join("node")
+        .join(peer_id.to_string());
+    Ok(dir)
 }
 
 fn keypair_from_path(path: impl AsRef<Path>) -> eyre::Result<Keypair> {

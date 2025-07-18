@@ -45,7 +45,6 @@ jobs:
           action: start
           enable-evm-testnet: true
           node-path: target/release/antnode
-          platform: ubuntu-latest
           build: true
 
       - name: Check ANT_PEERS was set
@@ -70,7 +69,7 @@ jobs:
         shell: bash
 
       - name: File upload
-        run: ./target/release/ant --log-output-dest=data-dir --local file upload --public "./the-test-data.zip" > ./upload_output 2>&1
+        run: ./target/release/ant --log-output-dest=data-dir --local file upload --public "./the-test-data.zip" --retry-failed 3 > ./upload_output 2>&1
         env:
           ANT_LOG: "v"
         timeout-minutes: 15
@@ -98,7 +97,7 @@ jobs:
           ls -l $ANT_DATA_PATH/client_first/logs
           mkdir $ANT_DATA_PATH/client
           ls -l $ANT_DATA_PATH
-          ./target/release/ant --log-output-dest=data-dir --local file upload --public "./the-test-data.zip" > ./upload_output_second 2>&1
+          ./target/release/ant --log-output-dest=data-dir --local file upload --public "./the-test-data.zip" --retry-failed 3 > ./upload_output_second 2>&1
           rg 'All chunks already exist on the network.' ./upload_output_second -c --stats
         env:
           ANT_LOG: "all"
@@ -183,8 +182,7 @@ jobs:
         uses: maidsafe/ant-local-testnet-action@main
         with:
           action: stop
-          log_file_prefix: safe_test_logs_memcheck
-          platform: ubuntu-latest
+          log_file_prefix: ant_test_logs_memcheck
           build: true
 
       - name: Check node memory usage

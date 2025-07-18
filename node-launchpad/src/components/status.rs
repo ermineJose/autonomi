@@ -38,7 +38,7 @@ use ant_bootstrap::InitialPeersConfig;
 use ant_node_manager::add_services::config::PortRange;
 use ant_node_manager::config::get_node_registry_path;
 use ant_service_management::{
-    control::ServiceController, NodeRegistry, NodeServiceData, ServiceStatus,
+    control::ServiceController, NodeRegistryManager, NodeServiceData, ServiceStatus,
 };
 use color_eyre::eyre::{Ok, OptionExt, Result};
 use crossterm::event::KeyEvent;
@@ -131,6 +131,7 @@ pub struct StatusConfig {
 
 impl Status<'_> {
     pub async fn new(config: StatusConfig) -> Result<Self> {
+        let node_registry = NodeRegistryManager::load(&get_node_registry_path()?).await?;
         let mut status = Self {
             init_peers_config: config.init_peers_config,
             action_sender: Default::default(),
@@ -143,7 +144,7 @@ impl Status<'_> {
             node_stats: NodeStats::default(),
             node_stats_last_update: Instant::now(),
             node_services: Default::default(),
-            node_management: NodeManagement::new()?,
+            node_management: NodeManagement::new(node_registry.clone())?,
             items: None,
             nodes_to_start: config.allocated_disk_space,
             rewards_address: config.rewards_address,
@@ -161,18 +162,21 @@ impl Status<'_> {
         // Nodes registry
         let now = Instant::now();
         debug!("Refreshing node registry states on startup");
-        let mut node_registry = NodeRegistry::load(&get_node_registry_path()?)?;
+
         ant_node_manager::refresh_node_registry(
-            &mut node_registry,
+            node_registry.clone(),
             &ServiceController {},
             false,
             true,
             ant_node_manager::VerbosityLevel::Minimal,
         )
         .await?;
-        node_registry.save()?;
+        node_registry.save().await?;
         debug!("Node registry states refreshed in {:?}", now.elapsed());
-        status.load_node_registry_and_update_states()?;
+        status.update_node_state(
+            node_registry.get_node_service_data().await,
+            node_registry.nat_status.read().await.is_some(),
+        )?;
 
         Ok(status)
     }
@@ -351,16 +355,20 @@ impl Status<'_> {
             .ok_or_eyre("Action sender not registered")
     }
 
-    fn load_node_registry_and_update_states(&mut self) -> Result<()> {
-        let node_registry = NodeRegistry::load(&get_node_registry_path()?)?;
-        self.is_nat_status_determined = node_registry.nat_status.is_some();
-        self.node_services = node_registry
-            .nodes
+    fn update_node_state(
+        &mut self,
+        all_nodes_data: Vec<NodeServiceData>,
+        is_nat_status_determined: bool,
+    ) -> Result<()> {
+        self.is_nat_status_determined = is_nat_status_determined;
+
+        self.node_services = all_nodes_data
             .into_iter()
             .filter(|node| node.status != ServiceStatus::Removed)
             .collect();
+
         info!(
-            "Loaded node registry. Maintaining {:?} nodes.",
+            "Updated state from the data passed from NodeRegistryManager. Maintaining {:?} nodes.",
             self.node_services.len()
         );
 
@@ -522,7 +530,11 @@ impl Component for Status<'_> {
                 StatusActions::NodesStatsObtained(stats) => {
                     self.node_stats = stats;
                 }
-                StatusActions::StartNodesCompleted { service_name } => {
+                StatusActions::StartNodesCompleted {
+                    service_name,
+                    all_nodes_data,
+                    is_nat_status_determined,
+                } => {
                     if service_name == *NODES_ALL {
                         if let Some(items) = &self.items {
                             let items_clone = items.clone();
@@ -535,14 +547,21 @@ impl Component for Status<'_> {
                         self.unlock_service(service_name.as_str());
                         self.update_item(service_name, NodeStatus::Running)?;
                     }
-                    self.load_node_registry_and_update_states()?;
+                    self.update_node_state(all_nodes_data, is_nat_status_determined)?;
                 }
-                StatusActions::StopNodesCompleted { service_name } => {
+                StatusActions::StopNodesCompleted {
+                    service_name,
+                    all_nodes_data,
+                    is_nat_status_determined,
+                } => {
                     self.unlock_service(service_name.as_str());
                     self.update_item(service_name, NodeStatus::Stopped)?;
-                    self.load_node_registry_and_update_states()?;
+                    self.update_node_state(all_nodes_data, is_nat_status_determined)?;
                 }
-                StatusActions::UpdateNodesCompleted => {
+                StatusActions::UpdateNodesCompleted {
+                    all_nodes_data,
+                    is_nat_status_determined,
+                } => {
                     if let Some(items) = &self.items {
                         let items_clone = items.clone();
                         for item in &items_clone.items {
@@ -550,18 +569,24 @@ impl Component for Status<'_> {
                         }
                     }
                     self.clear_node_items();
-                    self.load_node_registry_and_update_states()?;
+                    self.update_node_state(all_nodes_data, is_nat_status_determined)?;
+
                     let _ = self.update_node_items(None);
                     debug!("Update nodes completed");
                 }
-                StatusActions::ResetNodesCompleted { trigger_start_node } => {
+                StatusActions::ResetNodesCompleted {
+                    trigger_start_node,
+                    all_nodes_data,
+                    is_nat_status_determined,
+                } => {
                     if let Some(items) = &self.items {
                         let items_clone = items.clone();
                         for item in &items_clone.items {
                             self.unlock_service(item.name.as_str());
                         }
                     }
-                    self.load_node_registry_and_update_states()?;
+                    self.update_node_state(all_nodes_data, is_nat_status_determined)?;
+
                     self.clear_node_items();
 
                     if trigger_start_node {
@@ -570,16 +595,27 @@ impl Component for Status<'_> {
                     }
                     debug!("Reset nodes completed");
                 }
-                StatusActions::AddNodesCompleted { service_name } => {
+                StatusActions::AddNodesCompleted {
+                    service_name,
+
+                    all_nodes_data,
+                    is_nat_status_determined,
+                } => {
                     self.unlock_service(service_name.as_str());
                     self.update_item(service_name.clone(), NodeStatus::Stopped)?;
-                    self.load_node_registry_and_update_states()?;
+                    self.update_node_state(all_nodes_data, is_nat_status_determined)?;
+
                     debug!("Adding {:?} completed", service_name.clone());
                 }
-                StatusActions::RemoveNodesCompleted { service_name } => {
+                StatusActions::RemoveNodesCompleted {
+                    service_name,
+                    all_nodes_data,
+                    is_nat_status_determined,
+                } => {
                     self.unlock_service(service_name.as_str());
                     self.update_item(service_name, NodeStatus::Removed)?;
-                    self.load_node_registry_and_update_states()?;
+                    self.update_node_state(all_nodes_data, is_nat_status_determined)?;
+
                     let _ = self.update_node_items(None);
                     debug!("Removing nodes completed");
                 }
@@ -891,7 +927,7 @@ impl Component for Status<'_> {
                     if (GB_PER_NODE as usize) > self.available_disk_space_gb {
                         self.error_popup = Some(ErrorPopup::new(
                         "Cannot Add Node".to_string(),
-                        format!("\nEach Node requires {}GB of available space.", GB_PER_NODE),
+                        format!("\nEach Node requires {GB_PER_NODE}GB of available space."),
                         format!("{} has only {}GB remaining.\n\nYou can free up some space or change to different drive in the options.", get_drive_name(&self.storage_mountpoint)?, self.available_disk_space_gb),
                     ));
                         if let Some(error_popup) = &mut self.error_popup {
@@ -912,8 +948,7 @@ impl Component for Status<'_> {
                         self.error_popup = Some(ErrorPopup::new(
                             "Cannot Add Node".to_string(),
                             format!(
-                                "There are not enough ports available in your\ncustom port range to start another node ({}).",
-                                MAX_NODE_COUNT
+                                "There are not enough ports available in your\ncustom port range to start another node ({MAX_NODE_COUNT})."
                             ),
                             "\nVisit autonomi.com/support/port-error for help".to_string(),
                         ));
@@ -1032,7 +1067,6 @@ impl Component for Status<'_> {
             },
             Action::OptionsActions(OptionsActions::UpdateNodes) => {
                 debug!("Got action to Update Nodes");
-                self.load_node_registry_and_update_states()?;
                 let action_sender = self.get_actions_sender()?;
                 info!("Got action to update nodes");
                 let _ = self.update_node_items(Some(NodeStatus::Updating));
@@ -1042,7 +1076,7 @@ impl Component for Status<'_> {
                     action_sender,
                     connection_timeout_s: 5,
                     do_not_start: true,
-                    custom_bin_path: None,
+                    custom_bin_path: self.antnode_path.clone(),
                     force: false,
                     fixed_interval: Some(FIXED_INTERVAL),
                     peer_ids,
@@ -1260,10 +1294,9 @@ impl Component for Status<'_> {
 
                 let line2 = Line::from(vec![Span::styled(
                     format!(
-                        "Each node will use {}GB of storage and a small amount of memory, \
+                        "Each node will use {GB_PER_NODE}GB of storage and a small amount of memory, \
                         CPU, and Network bandwidth. Most computers can run many nodes at once, \
-                        but we recommend you add them gradually",
-                        GB_PER_NODE
+                        but we recommend you add them gradually"
                     ),
                     Style::default().fg(LIGHT_PERIWINKLE),
                 )]);

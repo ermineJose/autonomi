@@ -245,16 +245,20 @@ impl Client {
         let mut upload_tasks = vec![];
         #[cfg(feature = "loud")]
         let total_chunks = chunks.len();
-        for (_i, &chunk) in chunks.iter().enumerate() {
+        for (i, &chunk) in chunks.iter().enumerate() {
             let self_clone = self.clone();
             let address = *chunk.address();
 
             let Some((proof, price)) = receipt.get(chunk.name()) else {
-                debug!("Chunk at {address:?} was already paid for so skipping");
+                debug!(
+                    "({}/{}) Chunk at {address:?} was already paid for so skipping",
+                    i + 1,
+                    chunks.len()
+                );
                 #[cfg(feature = "loud")]
                 println!(
                     "({}/{}) Chunk stored at: {} (skipping, already exists)",
-                    _i + 1,
+                    i + 1,
                     chunks.len(),
                     chunk.address().to_hex()
                 );
@@ -272,7 +276,7 @@ impl Client {
                     Ok(_addr) => {
                         println!(
                             "({}/{}) Chunk stored at: {}",
-                            _i + 1,
+                            i + 1,
                             total_chunks,
                             chunk.address().to_hex()
                         );
@@ -280,7 +284,7 @@ impl Client {
                     Err((_, err)) => {
                         println!(
                             "({}/{}) Chunk failed to be stored at: {} ({err})",
-                            _i + 1,
+                            i + 1,
                             total_chunks,
                             chunk.address().to_hex()
                         );
@@ -391,45 +395,58 @@ impl Client {
 
     /// Fetch and decrypt all chunks in the data map.
     pub(crate) async fn fetch_from_data_map(&self, data_map: &DataMap) -> Result<Bytes, GetError> {
-        debug!("Fetching encrypted data chunks from data map {data_map:?}");
+        let total_chunks = data_map.infos().len();
+        #[cfg(feature = "loud")]
+        println!("Fetching {total_chunks} encrypted data chunks from network.");
+        debug!("Fetching {total_chunks} encrypted data chunks from data map {data_map:?}");
+
         let mut download_tasks = vec![];
-        for info in data_map.infos() {
+        for (i, info) in data_map.infos().into_iter().enumerate() {
             download_tasks.push(async move {
-                match self
-                    .chunk_get(&ChunkAddress::new(info.dst_hash))
-                    .await
-                    .inspect_err(|err| {
-                        error!(
-                            "Error fetching chunk {:?}: {err:?}",
-                            ChunkAddress::new(info.dst_hash)
-                        )
-                    }) {
-                    Ok(chunk) => Ok(EncryptedChunk {
-                        index: info.index,
-                        content: chunk.value,
-                    }),
+                let idx = i + 1;
+                let chunk_addr = ChunkAddress::new(info.dst_hash);
+
+                #[cfg(feature = "loud")]
+                println!("Fetching chunk {idx}/{total_chunks} ...");
+                info!("Fetching chunk {idx}/{total_chunks}({chunk_addr:?})");
+
+                match self.chunk_get(&chunk_addr).await {
+                    Ok(chunk) => {
+                        #[cfg(feature = "loud")]
+                        println!("Fetching chunk {idx}/{total_chunks} [DONE]");
+                        info!("Successfully fetched chunk {idx}/{total_chunks}({chunk_addr:?})");
+                        Ok(EncryptedChunk {
+                            index: info.index,
+                            content: chunk.value,
+                        })
+                    }
                     Err(err) => {
+                        #[cfg(feature = "loud")]
+                        println!("Error fetching chunk {idx}/{total_chunks}: {err:?}");
                         error!(
-                            "Error fetching chunk {:?}: {err:?}",
-                            ChunkAddress::new(info.dst_hash)
+                            "Error fetching chunk {idx}/{total_chunks}({chunk_addr:?}): {err:?}"
                         );
                         Err(err)
                     }
                 }
             });
         }
-        debug!("Successfully fetched all the encrypted chunks");
         let encrypted_chunks =
             process_tasks_with_max_concurrency(download_tasks, *CHUNK_DOWNLOAD_BATCH_SIZE)
                 .await
                 .into_iter()
                 .collect::<Result<Vec<EncryptedChunk>, GetError>>()?;
+        #[cfg(feature = "loud")]
+        println!("Successfully fetched all {total_chunks} encrypted chunks");
+        debug!("Successfully fetched all {total_chunks} encrypted chunks");
 
         let data = decrypt_full_set(data_map, &encrypted_chunks).map_err(|e| {
             error!("Error decrypting encrypted_chunks: {e:?}");
             GetError::Decryption(crate::self_encryption::Error::SelfEncryption(e))
         })?;
-        debug!("Successfully decrypted all the chunks");
+        #[cfg(feature = "loud")]
+        println!("Successfully decrypted all {total_chunks} chunks");
+        debug!("Successfully decrypted all {total_chunks} chunks");
         Ok(data)
     }
 }

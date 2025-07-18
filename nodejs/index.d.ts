@@ -201,7 +201,7 @@ export declare class Client {
    */
   vaultCost(owner: VaultSecretKey, maxSize: bigint): Promise<string>
   /**
-   * Put data into the client’s VaultPacket
+   * Put data into the client's VaultPacket
    *
    * Dynamically expand the vault capacity by paying for more space (Scratchpad) when needed.
    *
@@ -220,7 +220,7 @@ export declare class Client {
   /**
    * Create a new register key from a SecretKey and a name.
    *
-   * This derives a new SecretKey from the owner’s SecretKey using the name. Note that you will need to keep track of the names you used to create the register key.
+   * This derives a new SecretKey from the owner's SecretKey using the name. Note that you will need to keep track of the names you used to create the register key.
    */
   static registerKeyFromName(owner: SecretKey, name: string): SecretKey
   /** Create a new RegisterValue from bytes, make sure the bytes are not longer than REGISTER_VALUE_SIZE */
@@ -238,7 +238,7 @@ export declare class Client {
   registerUpdate(owner: SecretKey, newValue: Uint8Array, paymentOption: PaymentOption): Promise<string>
   /** Get the current value of the register */
   registerGet(addr: RegisterAddress): Promise<Uint8Array>
-  /** Get the cost of a register operation. Returns the cost of creation if it doesn’t exist, else returns the cost of an update */
+  /** Get the cost of a register operation. Returns the cost of creation if it doesn't exist, else returns the cost of an update */
   registerCost(owner: PublicKey): Promise<string>
 }
 export declare class ChunkPut {

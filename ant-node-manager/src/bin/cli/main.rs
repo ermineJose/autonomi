@@ -15,8 +15,9 @@ use ant_logging::{LogBuilder, LogFormat};
 use ant_node_manager::{
     add_services::config::PortRange,
     cmd::{self},
-    VerbosityLevel, DEFAULT_NODE_STARTUP_CONNECTION_TIMEOUT_S,
+    config, VerbosityLevel, DEFAULT_NODE_STARTUP_CONNECTION_TIMEOUT_S,
 };
+use ant_service_management::NodeRegistryManager;
 use clap::{Parser, Subcommand};
 use color_eyre::{eyre::eyre, Result};
 use libp2p::Multiaddr;
@@ -246,6 +247,9 @@ pub enum SubCmd {
         /// The binary will be downloaded.
         #[clap(long)]
         version: Option<String>,
+        /// Set this to true if you want the node to write the cache files in the older formats.
+        #[clap(long, default_value_t = false)]
+        write_older_cache_files: bool,
     },
     /// Get node reward balances.
     #[clap(name = "balance")]
@@ -263,8 +267,6 @@ pub enum SubCmd {
     },
     #[clap(subcommand)]
     Daemon(DaemonSubCmd),
-    #[clap(subcommand)]
-    Faucet(FaucetSubCmd),
     #[clap(subcommand)]
     Local(LocalSubCmd),
     #[clap(subcommand)]
@@ -518,108 +520,6 @@ pub enum DaemonSubCmd {
     /// This command must run as the root/administrative user.
     #[clap(name = "stop")]
     Stop {},
-}
-
-/// Manage the faucet service.
-#[derive(Subcommand, Debug)]
-pub enum FaucetSubCmd {
-    /// Add a faucet service.
-    ///
-    /// By default, the latest faucet binary will be downloaded; however, it is possible to provide
-    /// a binary either by specifying a URL, a local path, or a specific version number.
-    ///
-    /// This command must run as the root/administrative user.
-    ///
-    /// Windows is not supported for running a faucet.
-    #[clap(name = "add")]
-    Add {
-        /// Provide environment variables for the faucet service.
-        ///
-        /// Useful to set log levels. Variables should be comma separated without spaces.
-        ///
-        /// Example: --env ANT_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(name = "env", long, use_value_delimiter = false, value_parser = parse_environment_variables)]
-        env_variables: Option<Vec<(String, String)>>,
-        /// Provide the path for the log directory for the faucet.
-        ///
-        /// If not provided, the default location /var/log/faucet.
-        #[clap(long, verbatim_doc_comment)]
-        log_dir_path: Option<PathBuf>,
-        /// Provide a path for the faucet binary to be used by the service.
-        ///
-        /// Useful for creating the faucet service using a custom built binary.
-        #[clap(long)]
-        path: Option<PathBuf>,
-        #[command(flatten)]
-        peers: InitialPeersConfig,
-        /// Provide a faucet binary using a URL.
-        ///
-        /// The binary must be inside a zip or gzipped tar archive.
-        ///
-        /// This option can be used to test a faucet binary that has been built from a forked
-        /// branch and uploaded somewhere. A typical use case would be for a developer who launches
-        /// a testnet to test some changes they have on a fork.
-        #[clap(long, conflicts_with = "version")]
-        url: Option<String>,
-        /// Provide a specific version of the faucet to be installed.
-        ///
-        /// The version number should be in the form X.Y.Z, with no 'v' prefix.
-        ///
-        /// The binary will be downloaded.
-        #[clap(long)]
-        version: Option<String>,
-    },
-    /// Start the faucet service.
-    ///
-    /// This command must run as the root/administrative user.
-    #[clap(name = "start")]
-    Start {},
-    /// Stop the faucet service.
-    ///
-    /// This command must run as the root/administrative user.
-    #[clap(name = "stop")]
-    Stop {},
-    /// Upgrade the faucet.
-    ///
-    /// The running faucet will be stopped, its binary will be replaced, then it will be started
-    /// again.
-    ///
-    /// This command must run as the root/administrative user.
-    #[clap(name = "upgrade")]
-    Upgrade {
-        /// Set this flag to upgrade the faucet without starting it.
-        ///
-        /// Can be useful for testing scenarios.
-        #[clap(long)]
-        do_not_start: bool,
-        /// Set this flag to force the upgrade command to replace binaries without comparing any
-        /// version numbers.
-        ///
-        /// Required if we want to downgrade, or for testing purposes.
-        #[clap(long)]
-        force: bool,
-        /// Provide environment variables for the faucet service.
-        ///
-        /// Values set when the service was added will be overridden.
-        ///
-        /// Useful to set log levels. Variables should be comma separated without spaces.
-        ///
-        /// Example: --env ANT_LOG=all,RUST_LOG=libp2p=debug
-        #[clap(name = "env", long, use_value_delimiter = false, value_parser = parse_environment_variables)]
-        env_variables: Option<Vec<(String, String)>>,
-        /// Provide a binary to upgrade to using a URL.
-        ///
-        /// The binary must be inside a zip or gzipped tar archive.
-        ///
-        /// This can be useful for testing scenarios.
-        #[clap(long, conflicts_with = "version")]
-        url: Option<String>,
-        /// Upgrade to a specific version rather than the latest version.
-        ///
-        /// The version number should be in the form X.Y.Z, with no 'v' prefix.
-        #[clap(long)]
-        version: Option<String>,
-    },
 }
 
 /// Manage NAT detection.
@@ -924,6 +824,7 @@ async fn main() -> Result<()> {
 
     tracing::info!("Executing cmd: {:?}", args.cmd);
 
+    let node_registry = NodeRegistryManager::load(&config::get_node_registry_path()?).await?;
     match args.cmd {
         Some(SubCmd::Add {
             alpha,
@@ -952,6 +853,7 @@ async fn main() -> Result<()> {
             no_upnp,
             user,
             version,
+            write_older_cache_files,
         }) => {
             cmd::node::add(
                 alpha,
@@ -970,6 +872,7 @@ async fn main() -> Result<()> {
                 network_id,
                 node_ip,
                 node_port,
+                node_registry,
                 peers,
                 relay,
                 rewards_address,
@@ -981,6 +884,7 @@ async fn main() -> Result<()> {
                 user,
                 version,
                 verbosity,
+                write_older_cache_files,
             )
             .await?;
             Ok(())
@@ -988,7 +892,7 @@ async fn main() -> Result<()> {
         Some(SubCmd::Balance {
             peer_id: peer_ids,
             service_name: service_names,
-        }) => cmd::node::balance(peer_ids, service_names, verbosity).await,
+        }) => cmd::node::balance(peer_ids, node_registry, service_names, verbosity).await,
         Some(SubCmd::Daemon(DaemonSubCmd::Add {
             address,
             env_variables,
@@ -999,46 +903,6 @@ async fn main() -> Result<()> {
         })) => cmd::daemon::add(address, env_variables, port, path, url, version, verbosity).await,
         Some(SubCmd::Daemon(DaemonSubCmd::Start {})) => cmd::daemon::start(verbosity).await,
         Some(SubCmd::Daemon(DaemonSubCmd::Stop {})) => cmd::daemon::stop(verbosity).await,
-        Some(SubCmd::Faucet(faucet_command)) => match faucet_command {
-            FaucetSubCmd::Add {
-                env_variables,
-                log_dir_path,
-                path,
-                peers,
-                url,
-                version,
-            } => {
-                cmd::faucet::add(
-                    env_variables,
-                    log_dir_path,
-                    peers,
-                    path,
-                    url,
-                    version,
-                    verbosity,
-                )
-                .await
-            }
-            FaucetSubCmd::Start {} => cmd::faucet::start(verbosity).await,
-            FaucetSubCmd::Stop {} => cmd::faucet::stop(verbosity).await,
-            FaucetSubCmd::Upgrade {
-                do_not_start,
-                force,
-                env_variables: provided_env_variable,
-                url,
-                version,
-            } => {
-                cmd::faucet::upgrade(
-                    do_not_start,
-                    force,
-                    provided_env_variable,
-                    url,
-                    version,
-                    verbosity,
-                )
-                .await
-            }
-        },
         Some(SubCmd::Local(local_command)) => match local_command {
             LocalSubCmd::Join {
                 build,
@@ -1080,7 +944,9 @@ async fn main() -> Result<()> {
                 )
                 .await
             }
-            LocalSubCmd::Kill { keep_directories } => cmd::local::kill(keep_directories, verbosity),
+            LocalSubCmd::Kill { keep_directories } => {
+                cmd::local::kill(keep_directories, verbosity).await
+            }
             LocalSubCmd::Run {
                 build,
                 clean,
@@ -1140,8 +1006,17 @@ async fn main() -> Result<()> {
             keep_directories,
             peer_id: peer_ids,
             service_name: service_names,
-        }) => cmd::node::remove(keep_directories, peer_ids, service_names, verbosity).await,
-        Some(SubCmd::Reset { force }) => cmd::node::reset(force, verbosity).await,
+        }) => {
+            cmd::node::remove(
+                keep_directories,
+                peer_ids,
+                node_registry,
+                service_names,
+                verbosity,
+            )
+            .await
+        }
+        Some(SubCmd::Reset { force }) => cmd::node::reset(force, node_registry, verbosity).await,
         Some(SubCmd::Start {
             connection_timeout,
             interval,
@@ -1151,6 +1026,7 @@ async fn main() -> Result<()> {
             cmd::node::start(
                 connection_timeout,
                 interval,
+                node_registry,
                 peer_ids,
                 service_names,
                 verbosity,
@@ -1161,12 +1037,12 @@ async fn main() -> Result<()> {
             details,
             fail,
             json,
-        }) => cmd::node::status(details, fail, json).await,
+        }) => cmd::node::status(details, fail, json, node_registry).await,
         Some(SubCmd::Stop {
             interval,
             peer_id: peer_ids,
             service_name: service_names,
-        }) => cmd::node::stop(interval, peer_ids, service_names, verbosity).await,
+        }) => cmd::node::stop(interval, node_registry, peer_ids, service_names, verbosity).await,
         Some(SubCmd::Upgrade {
             connection_timeout,
             do_not_start,
@@ -1185,6 +1061,7 @@ async fn main() -> Result<()> {
                 path,
                 force,
                 interval,
+                node_registry,
                 peer_ids,
                 provided_env_variable,
                 service_names,

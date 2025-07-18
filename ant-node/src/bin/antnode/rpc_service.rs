@@ -81,11 +81,14 @@ impl AntNode for SafeNodeRpcService {
             request.get_ref()
         );
 
-        let state = self
-            .running_node
-            .get_swarm_local_state()
-            .await
-            .expect("failed to get local swarm state");
+        let state = match self.running_node.get_swarm_local_state().await {
+            Ok(state) => state,
+            Err(err) => {
+                return Err(Status::invalid_argument(format!(
+                    "Failed to get local swarm state: {err:?}"
+                )))
+            }
+        };
         let connected_peers = state.connected_peers.iter().map(|p| p.to_bytes()).collect();
         let listeners = state.listeners.iter().map(|m| m.to_string()).collect();
 
@@ -147,14 +150,14 @@ impl AntNode for SafeNodeRpcService {
             request.get_ref()
         );
 
-        let addresses = self
-            .running_node
-            .get_all_record_addresses()
-            .await
-            .expect("failed to get record addresses")
-            .into_iter()
-            .map(|addr| addr.as_bytes())
-            .collect();
+        let addresses = match self.running_node.get_all_record_addresses().await {
+            Ok(addresses) => addresses.into_iter().map(|addr| addr.as_bytes()).collect(),
+            Err(err) => {
+                return Err(Status::invalid_argument(format!(
+                    "Failed to get record addresses: {err:?}"
+                )))
+            }
+        };
 
         Ok(Response::new(RecordAddressesResponse { addresses }))
     }
@@ -169,18 +172,22 @@ impl AntNode for SafeNodeRpcService {
             request.get_ref()
         );
 
-        let kbuckets: HashMap<u32, k_buckets_response::Peers> = self
-            .running_node
-            .get_kbuckets()
-            .await
-            .expect("failed to get k-buckets")
-            .into_iter()
-            .map(|(ilog2_distance, peers)| {
-                let peers = peers.into_iter().map(|peer| peer.to_bytes()).collect();
-                let peers = k_buckets_response::Peers { peers };
-                (ilog2_distance, peers)
-            })
-            .collect();
+        let kbuckets: HashMap<u32, k_buckets_response::Peers> =
+            match self.running_node.get_kbuckets().await {
+                Ok(kbuckets) => kbuckets
+                    .into_iter()
+                    .map(|(ilog2_distance, peers)| {
+                        let peers = peers.into_iter().map(|peer| peer.to_bytes()).collect();
+                        let peers = k_buckets_response::Peers { peers };
+                        (ilog2_distance, peers)
+                    })
+                    .collect(),
+                Err(err) => {
+                    return Err(Status::invalid_argument(format!(
+                        "Failed to get k-buckets: {err:?}"
+                    )))
+                }
+            };
 
         Ok(Response::new(KBucketsResponse { kbuckets }))
     }

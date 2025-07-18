@@ -793,7 +793,7 @@ impl Client {
         Ok(cost.to_string())
     }
 
-    /// Put data into the client’s VaultPacket
+    /// Put data into the client's VaultPacket
     ///
     /// Dynamically expand the vault capacity by paying for more space (Scratchpad) when needed.
     ///
@@ -838,7 +838,7 @@ impl Client {
 
     /// Create a new register key from a SecretKey and a name.
     ///
-    /// This derives a new SecretKey from the owner’s SecretKey using the name. Note that you will need to keep track of the names you used to create the register key.
+    /// This derives a new SecretKey from the owner's SecretKey using the name. Note that you will need to keep track of the names you used to create the register key.
     #[napi]
     pub fn register_key_from_name(owner: &SecretKey, name: String) -> SecretKey {
         let key = autonomi::Client::register_key_from_name(&owner.0, &name);
@@ -905,7 +905,7 @@ impl Client {
             .map_err(map_error)
     }
 
-    /// Get the cost of a register operation. Returns the cost of creation if it doesn’t exist, else returns the cost of an update
+    /// Get the cost of a register operation. Returns the cost of creation if it doesn't exist, else returns the cost of an update
     #[napi]
     pub async fn register_cost(&self, owner: &PublicKey) -> Result</* AttoTokens */ String> {
         let cost = self

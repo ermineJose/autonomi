@@ -40,7 +40,6 @@ jobs:
           action: start
           enable-evm-testnet: true
           node-path: target/release/antnode
-          platform: ${{ matrix.os }}
           build: true
 
       - name: Check if ANT_PEERS and EVM_NETWORK are set
@@ -207,8 +206,7 @@ jobs:
         uses: maidsafe/ant-local-testnet-action@main
         with:
           action: stop
-          log_file_prefix: safe_test_logs_e2e
-          platform: ${{ matrix.os }}
+          log_file_prefix: ant_test_logs_e2e
 
       - name: post notification to slack on failure
         if: ${{ failure() }}
@@ -249,13 +247,13 @@ jobs:
         timeout-minutes: 25
         run: cargo test --release --package node-launchpad
 
-      - name: Run node tests
+      - name: Run node tests (except can_store_after_restart)
         timeout-minutes: 25
-        run: cargo test --release --package ant-node --lib
+        run: cargo test --release --package ant-node -- --skip can_store_after_restart --skip data_availability_during_churn --skip verify_data_location --skip verify_routing_table
 
-      - name: Run network tests
-        timeout-minutes: 25
-        run: cargo test --release --package ant-networking --features="open-metrics"
+      - name: Run can_store_after_restart separately
+        timeout-minutes: 5
+        run: cargo test --release --package ant-node can_store_after_restart
 
       - name: Run protocol tests
         timeout-minutes: 25
@@ -315,7 +313,6 @@ jobs:
           action: start
           enable-evm-testnet: true
           node-path: target/release/antnode
-          platform: ${{ matrix.os }}
           build: true
 
       - name: Chunks data integrity during nodes churn (during 10min) (in theory)
@@ -332,8 +329,7 @@ jobs:
         uses: maidsafe/ant-local-testnet-action@main
         with:
           action: stop
-          log_file_prefix: safe_test_logs_churn
-          platform: ${{ matrix.os }}
+          log_file_prefix: ant_test_logs_churn
 
 
       - name: Get total node count
@@ -468,7 +464,6 @@ jobs:
           action: start
           enable-evm-testnet: true
           node-path: target/release/antnode
-          platform: ${{ matrix.os }}
           build: true
 
       - name: Verify the Routing table of the nodes
@@ -495,8 +490,7 @@ jobs:
         uses: maidsafe/ant-local-testnet-action@main
         with:
           action: stop
-          log_file_prefix: safe_test_logs_data_location
-          platform: ${{ matrix.os }}
+          log_file_prefix: ant_test_logs_data_location
 
       - name: Verify restart of nodes using rg
         shell: bash

@@ -1,6 +1,6 @@
 # Bootstrap Cache
 
-A robust peer caching system for the Autonomi Network that provides persistent storage and management of network peer addresses. This crate handles peer discovery, caching, and reliability tracking with support for concurrent access across multiple processes.
+A simple peer caching system for the Autonomi Network that provides persistent storage and management of network peer addresses. This crate handles peer discovery and FIFO caching with support for concurrent access across multiple processes.
 
 ## Features
 
@@ -13,9 +13,8 @@ A robust peer caching system for the Autonomi Network that provides persistent s
 ### Data Management
 - Automatic cleanup of stale and unreliable peers
 - Configurable maximum peer limit
-- Peer reliability tracking (success/failure counts)
 - Atomic file operations for data integrity
 
 ## License
 
-This SAFE Network Software is licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) http://www.gnu.org/licenses/gpl-3.0.en.html).
+This Autonomi Network software is licensed under the General Public License (GPL), version 3 ([LICENSE](http://www.gnu.org/licenses/gpl-3.0.en.html)).

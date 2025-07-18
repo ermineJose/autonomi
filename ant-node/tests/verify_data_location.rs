@@ -9,7 +9,7 @@
 mod common;
 
 use ant_logging::LogBuilder;
-use ant_networking::sort_peers_by_key;
+use ant_node::sort_peers_by_key;
 use ant_protocol::{
     antnode_proto::{NodeInfoRequest, RecordAddressesRequest},
     NetworkAddress, PrettyPrintRecordKey, CLOSE_GROUP_SIZE,
@@ -65,8 +65,7 @@ type RecordHolders = HashMap<RecordKey, HashSet<NodeIndex>>;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn verify_data_location() -> Result<()> {
-    let _log_appender_guard =
-        LogBuilder::init_multi_threaded_tokio_test("verify_data_location", false);
+    let _log_appender_guard = LogBuilder::init_multi_threaded_tokio_test();
 
     let churn_count = if let Ok(str) = std::env::var("CHURN_COUNT") {
         str.parse::<u8>()?
@@ -86,7 +85,7 @@ async fn verify_data_location() -> Result<()> {
         "Performing data location verification with a churn count of {churn_count} and n_chunks {chunk_count}\nIt will take approx {:?}",
         VERIFICATION_DELAY*churn_count as u32
     );
-    let node_rpc_address = get_all_rpc_addresses(true)?;
+    let node_rpc_address = get_all_rpc_addresses(true).await?;
     let mut all_peers = get_all_peer_ids(&node_rpc_address).await?;
 
     let (client, wallet) = get_client_and_funded_wallet().await;
@@ -99,7 +98,7 @@ async fn verify_data_location() -> Result<()> {
     // Churn nodes and verify the location of the data after VERIFICATION_DELAY
     let mut current_churn_count = 0;
 
-    let mut node_restart = NodeRestart::new(true, false)?;
+    let mut node_restart = NodeRestart::new(true, false).await?;
     let mut node_index = 0;
     'main: loop {
         if current_churn_count >= churn_count {

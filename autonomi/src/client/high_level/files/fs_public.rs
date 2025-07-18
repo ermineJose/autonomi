@@ -7,18 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::archive_public::{ArchiveAddress, PublicArchive};
-use super::{CombinedChunks, DownloadError, FileCostError, Metadata, UploadError};
-use crate::client::high_level::files::{
-    get_relative_file_path_from_abs_file_and_folder_path, FILE_ENCRYPT_BATCH_SIZE,
-};
+use super::{DownloadError, FileCostError, Metadata, UploadError};
+use crate::client::high_level::data::DataAddress;
 use crate::client::payment::PaymentOption;
 use crate::client::Client;
-use crate::client::{high_level::data::DataAddress, utils::process_tasks_with_max_concurrency};
-use crate::self_encryption::encrypt;
+use crate::data::CombinedChunks;
 use crate::AttoTokens;
 use bytes::Bytes;
 use std::path::PathBuf;
-use std::time;
 use std::time::{Duration, SystemTime};
 
 impl Client {
@@ -70,63 +66,10 @@ impl Client {
     ) -> Result<(AttoTokens, PublicArchive), UploadError> {
         info!("Uploading directory: {dir_path:?}");
 
-        let mut encryption_tasks = vec![];
-
-        for entry in walkdir::WalkDir::new(&dir_path) {
-            let entry = entry?;
-
-            if entry.file_type().is_dir() {
-                continue;
-            }
-
-            let dir_path = dir_path.clone();
-
-            encryption_tasks.push(async move {
-                let file_path = entry.path().to_path_buf();
-
-                info!("Encrypting file: {file_path:?}..");
-                #[cfg(feature = "loud")]
-                println!("Encrypting file: {file_path:?}..");
-
-                let data = tokio::fs::read(&file_path)
-                    .await
-                    .map_err(|err| format!("Could not read file {file_path:?}: {err:?}"))?;
-                let data = Bytes::from(data);
-
-                if data.len() < 3 {
-                    let err_msg =
-                        format!("Skipping file {file_path:?}, as it is smaller than 3 bytes");
-                    return Err(err_msg);
-                }
-
-                let now = time::Instant::now();
-
-                let (data_map_chunk, mut chunks) = encrypt(data).map_err(|err| err.to_string())?;
-
-                debug!("Encryption of {file_path:?} took: {:.2?}", now.elapsed());
-
-                let data_address = *data_map_chunk.name();
-
-                chunks.push(data_map_chunk);
-
-                let metadata = metadata_from_entry(&entry);
-
-                let relative_path =
-                    get_relative_file_path_from_abs_file_and_folder_path(&file_path, &dir_path);
-
-                Ok((
-                    file_path.to_string_lossy().to_string(),
-                    chunks,
-                    (relative_path, DataAddress::new(data_address), metadata),
-                ))
-            });
-        }
+        let encryption_results = self.encrypt_directory_files_public(dir_path).await?;
 
         let mut combined_chunks: CombinedChunks = vec![];
         let mut public_archive = PublicArchive::new();
-
-        let encryption_results =
-            process_tasks_with_max_concurrency(encryption_tasks, *FILE_ENCRYPT_BATCH_SIZE).await;
 
         for encryption_result in encryption_results {
             match encryption_result {
@@ -141,6 +84,8 @@ impl Client {
                 }
                 Err(err_msg) => {
                     error!("Error during file encryption: {err_msg}");
+                    #[cfg(feature = "loud")]
+                    println!("Error during file encryption: {err_msg}");
                 }
             }
         }
@@ -220,6 +165,7 @@ impl Client {
             content_addrs.extend(addrs);
 
             let metadata = metadata_from_entry(&entry);
+
             archive.add_file(path, DataAddress::new(map_xor_name), metadata);
         }
 

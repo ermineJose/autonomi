@@ -54,10 +54,10 @@ async fn scheduled_fetch() {
                 };
                 match write_to_file(&data) {
                     Ok(()) => println!("Data written to file successfully"),
-                    Err(e) => eprintln!("Failed to write to file: {}", e),
+                    Err(e) => eprintln!("Failed to write to file: {e}"),
                 }
             }
-            Err(e) => eprintln!("Failed to fetch API data: {}", e),
+            Err(e) => eprintln!("Failed to fetch API data: {e}"),
         }
 
         sleep(Duration::from_secs(43200)).await; // Sleep for 12 hours

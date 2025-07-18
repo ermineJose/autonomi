@@ -7,7 +7,7 @@ license = "GPL-3.0"
 name = "nat-detection"
 readme = "README.md"
 repository = "https://github.com/maidsafe/autonomi"
-version = "0.2.21-rc.1"
+version = "0.2.22"
 
 [[bin]]
 name = "nat-detection"
@@ -17,14 +17,13 @@ path = "src/main.rs"
 nightly = []
 
 [dependencies]
-ant-build-info = { path = "../ant-build-info", version = "0.1.28-rc.1" }
-ant-networking = { path = "../ant-networking", version = "0.3.13-rc.1" }
-ant-protocol = { path = "../ant-protocol", version = "1.0.6-rc.1" }
+ant-build-info = { path = "../ant-build-info", version = "0.1.29" }
+ant-protocol = { path = "../ant-protocol", version = "1.0.7" }
 clap = { version = "4.5.4", features = ["derive"] }
 clap-verbosity-flag = "2.2.0"
 color-eyre = { version = "0.6", default-features = false }
 futures = "~0.3.13"
-libp2p = { version = "0.55.0", features = [
+libp2p = { version = "0.56.0", features = [
     "tokio",
     "tcp",
     "noise",

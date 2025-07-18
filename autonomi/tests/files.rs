@@ -24,8 +24,7 @@ use walkdir::WalkDir;
 #[tokio::test]
 #[serial]
 async fn dir_upload_download() -> Result<()> {
-    let _log_appender_guard =
-        LogBuilder::init_single_threaded_tokio_test("dir_upload_download", false);
+    let _log_appender_guard = LogBuilder::init_single_threaded_tokio_test();
 
     let client = Client::init_local().await?;
     let wallet = get_funded_wallet();
@@ -80,7 +79,7 @@ fn compute_dir_sha256(dir: &str) -> Result<String> {
 #[tokio::test]
 #[serial]
 async fn file_into_vault() -> Result<()> {
-    let _log_appender_guard = LogBuilder::init_single_threaded_tokio_test("file", false);
+    let _log_appender_guard = LogBuilder::init_single_threaded_tokio_test();
 
     let client = Client::init_local().await?;
     let wallet = get_funded_wallet();
@@ -116,8 +115,7 @@ async fn file_into_vault() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn file_advanced_use() -> Result<()> {
-    let _log_appender_guard =
-        LogBuilder::init_single_threaded_tokio_test("file_advanced_use", false);
+    let _log_appender_guard = LogBuilder::init_single_threaded_tokio_test();
 
     let client = Client::init_local().await?;
     let wallet = get_funded_wallet();
@@ -174,6 +172,41 @@ async fn file_advanced_use() -> Result<()> {
         compute_dir_sha256("tests/file/test_dir")?,
         compute_dir_sha256(dest)?,
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn archives_use_paths_with_forward_slashes() -> Result<()> {
+    let _log_appender_guard = LogBuilder::init_single_threaded_tokio_test();
+
+    let client = Client::init_local().await?;
+    let wallet = get_funded_wallet();
+
+    let (_cost, pub_archive) = client
+        .dir_content_upload_public("tests/file/test_dir".into(), (&wallet).into())
+        .await?;
+
+    for (path, _metadata) in pub_archive.files() {
+        // The path should not contain any backslashes
+        assert!(
+            !path.to_string_lossy().contains(r"\"),
+            "Path in archive contains backslashes: {path:?}"
+        );
+    }
+
+    let (_cost, private_archive) = client
+        .dir_content_upload("tests/file/test_dir".into(), (&wallet).into())
+        .await?;
+
+    for (path, _metadata) in private_archive.files() {
+        // The path should not contain any backslashes
+        assert!(
+            !path.to_string_lossy().contains(r"\"),
+            "Path in archive contains backslashes: {path:?}"
+        );
+    }
 
     Ok(())
 }

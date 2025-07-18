@@ -7,15 +7,15 @@ license = "GPL-3.0"
 name = "ant-protocol"
 readme = "README.md"
 repository = "https://github.com/maidsafe/autonomi"
-version = "1.0.6-rc.1"
+version = "1.0.7"
 
 [features]
 default = []
 rpc = ["tonic", "prost"]
 
 [dependencies]
-ant-build-info = { path = "../ant-build-info", version = "0.1.28-rc.1" }
-ant-evm = { path = "../ant-evm", version = "0.1.15-rc.1" }
+ant-build-info = { path = "../ant-build-info", version = "0.1.29" }
+ant-evm = { path = "../ant-evm", version = "0.1.16" }
 bls = { package = "blsttc", version = "8.0.1" }
 bytes = { version = "1.0.1", features = ["serde"] }
 color-eyre = "0.6.3"
@@ -23,8 +23,8 @@ crdts = { version = "7.3", default-features = false, features = ["merkle"] }
 custom_debug = "~0.6.1"
 dirs-next = "~2.0.0"
 hex = "~0.4.3"
-libp2p = { version = "0.55.0", features = ["identify", "kad"] }
-prometheus-client = { version = "0.22" }
+libp2p = { version = "0.56.0", features = ["identify", "kad"] }
+prometheus-client = { version = "0.23.1" }
 prost = { version = "0.9", optional = true }
 rand = "0.8"
 rmp-serde = "1.1.1"

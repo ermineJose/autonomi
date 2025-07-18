@@ -61,7 +61,7 @@ pub fn open_logs(node_name: Option<String>) -> Result<(), eyre::Report> {
         .into_owned();
 
     let folder = if let Some(node_name) = node_name {
-        format!("{}/{}", service_path, node_name)
+        format!("{service_path}/{node_name}")
     } else {
         service_path.to_string()
     };

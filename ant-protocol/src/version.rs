@@ -11,51 +11,99 @@ use std::sync::{LazyLock, RwLock};
 pub const MAINNET_ID: u8 = 1;
 pub const ALPHANET_ID: u8 = 2;
 
-/// The network_id is used to differentiate between different networks.
-/// The default is set to 1 and it represents the mainnet.
+/// Network identifier used to differentiate between different networks.
+///
+/// ## Default Value
+/// Set to `1` representing the mainnet network.
+///
+/// ## Usage
+/// - Network isolation mechanism
+/// - Prevents cross-network contamination
+/// - Used in protocol strings and user-agent identifiers
 pub static NETWORK_ID: LazyLock<RwLock<u8>> = LazyLock::new(|| RwLock::new(1));
 
-/// The node version used during Identify Behaviour.
-pub static IDENTIFY_NODE_VERSION_STR: LazyLock<RwLock<String>> = LazyLock::new(|| {
-    RwLock::new(format!(
-        "ant/node/{}/{}",
-        get_truncate_version_str(),
-        *NETWORK_ID
-            .read()
-            .expect("Failed to obtain read lock for NETWORK_ID"),
-    ))
-});
+/// Node user-agent identifier for peer recognition and routing table management.
+///
+/// ## Purpose
+/// Functions as a user-agent identifier (similar to HTTP user-agent headers) that
+/// communicates peer type, its cargo package version, and network id to other peers.
+///
+/// ## Format
+/// `ant/node/{ant_protocol_version}/{ant_node_version}/{network_id}`
+///
+/// ## Behavior
+/// - Other nodes recognize this as a fellow routing participant
+/// - Peers with this identifier are added to routing tables (RT)
+pub fn construct_node_user_agent(node_version: String) -> String {
+    format!(
+        "ant/node/{ant_protocol_version}/{node_version}/{network_id}",
+        ant_protocol_version = get_truncate_version_str(),
+        network_id = get_network_id(),
+    )
+}
 
-/// The client version used during Identify Behaviour.
-pub static IDENTIFY_CLIENT_VERSION_STR: LazyLock<RwLock<String>> = LazyLock::new(|| {
-    RwLock::new(format!(
-        "ant/client/{}/{}",
-        get_truncate_version_str(),
-        *NETWORK_ID
-            .read()
-            .expect("Failed to obtain read lock for NETWORK_ID"),
-    ))
-});
+/// Client user-agent identifier for peer recognition and routing exclusion.
+///
+/// ## Purpose
+/// Functions as a user-agent identifier (similar to HTTP user-agent headers) that
+/// communicates peer type, its cargo package version, and network id to other peers.
+///
+/// ## Format
+/// `ant/client/{ant_protocol_version}/{ant_client_version}/{network_id}`
+///
+/// ## Behavior
+/// - Nodes search for "client" in this identifier and they are **excluded** from routing tables (RT)
+/// - Treated as network consumers rather than routing participants
+pub fn construct_client_user_agent(client_version: String) -> String {
+    format!(
+        "ant/client/{ant_protocol_version}/{client_version}/{network_id}",
+        ant_protocol_version = get_truncate_version_str(),
+        network_id = get_network_id(),
+    )
+}
 
 /// The req/response protocol version
+///
+/// Defines the protocol identifier used for libp2p request-response communication that is used during
+/// libp2p's multistream-select negotiation. Both peers must use identical protocol strings to establish communication.
+///
+/// ## Format
+/// `/ant/{ant_protocol_version}/{network_id}`
+///
+/// ## Protocol Matching
+/// - **Match**: Both peers negotiate successfully, communication proceeds
+/// - **Mismatch**: Connection fails with `UnsupportedProtocols` error
+///   - Different versions cannot communicate
+///   - Different network IDs are isolated
+///   - Connection remains open for other protocols
 pub static REQ_RESPONSE_VERSION_STR: LazyLock<RwLock<String>> = LazyLock::new(|| {
     RwLock::new(format!(
-        "/ant/{}/{}",
-        get_truncate_version_str(),
-        *NETWORK_ID
-            .read()
-            .expect("Failed to obtain read lock for NETWORK_ID"),
+        "/ant/{ant_protocol_version}/{network_id}",
+        ant_protocol_version = get_truncate_version_str(),
+        network_id = get_network_id()
     ))
 });
 
-/// The identify protocol version
+/// Identify protocol version string for peer compatibility verification.
+///
+/// ## Purpose
+/// Serves as a protocol handshake identifier ensuring peer communication compatibility.
+/// Both peers must have identical values to exchange messages successfully.
+///
+/// ## Format
+/// `ant/{ant_protocol_version}/{network_id}`
+///
+/// ## Compatibility Enforcement
+/// - **Compatible**: Peers with matching strings can communicate
+/// - **Incompatible**: Peers with different strings are:
+///   - Considered incompatible
+///   - Added to the blocklist
+///   - Protected against cross-network contamination
 pub static IDENTIFY_PROTOCOL_STR: LazyLock<RwLock<String>> = LazyLock::new(|| {
     RwLock::new(format!(
-        "ant/{}/{}",
-        get_truncate_version_str(),
-        *NETWORK_ID
-            .read()
-            .expect("Failed to obtain read lock for NETWORK_ID"),
+        "ant/{ant_protocol_version}/{network_id}",
+        ant_protocol_version = get_truncate_version_str(),
+        network_id = get_network_id(),
     ))
 });
 
@@ -75,20 +123,6 @@ pub fn set_network_id(id: u8) {
             .write()
             .expect("Failed to obtain write lock for NETWORK_ID");
         *network_id = id;
-    }
-
-    {
-        let mut identify_node = IDENTIFY_NODE_VERSION_STR
-            .write()
-            .expect("Failed to obtain write lock for IDENTIFY_NODE_VERSION_STR");
-        *identify_node = format!("ant/node/{}/{}", get_truncate_version_str(), id);
-    }
-
-    {
-        let mut identify_client = IDENTIFY_CLIENT_VERSION_STR
-            .write()
-            .expect("Failed to obtain write lock for IDENTIFY_CLIENT_VERSION_STR");
-        *identify_client = format!("ant/client/{}/{}", get_truncate_version_str(), id);
     }
 
     {
@@ -128,7 +162,7 @@ pub fn get_network_id_str() -> String {
 // Protocol support shall be downward compatible for patch only version update.
 // i.e. versions of `A.B.X` or `A.B.X-alpha.Y` shall be considered as a same protocol of `A.B`
 pub fn get_truncate_version_str() -> String {
-    let version_str = env!("CARGO_PKG_VERSION");
+    let version_str = env!("CARGO_PKG_VERSION").to_string();
     let parts = version_str.split('.').collect::<Vec<_>>();
     if parts.len() >= 2 {
         format!("{}.{}", parts[0], parts[1])
@@ -145,22 +179,19 @@ mod tests {
     fn test_print_version_strings() -> Result<(), Box<dyn std::error::Error>> {
         set_network_id(3);
         println!(
-            "\nIDENTIFY_NODE_VERSION_STR: {}",
-            *IDENTIFY_NODE_VERSION_STR
-                .read()
-                .expect("Failed to obtain read lock for IDENTIFY_NODE_VERSION_STR")
+            "\nNode user agent: {}",
+            construct_node_user_agent("1.0.0".to_string())
         );
         println!(
-            "IDENTIFY_CLIENT_VERSION_STR: {}",
-            *IDENTIFY_CLIENT_VERSION_STR
-                .read()
-                .expect("Failed to obtain read lock for IDENTIFY_CLIENT_VERSION_STR")
+            "Client user agent: {}",
+            construct_client_user_agent("1.0.0".to_string())
         );
         println!(
             "REQ_RESPONSE_VERSION_STR: {}",
-            *REQ_RESPONSE_VERSION_STR
-                .read()
-                .expect("Failed to obtain read lock for REQ_RESPONSE_VERSION_STR")
+            *REQ_RESPONSE_VERSION_STR.read().expect(
+                "Failed to 
+                obtain read lock for REQ_RESPONSE_VERSION_STR"
+            )
         );
         println!(
             "IDENTIFY_PROTOCOL_STR: {}",

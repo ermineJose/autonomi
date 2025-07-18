@@ -15,14 +15,13 @@ mod subcommands;
 
 use crate::log::{reset_critical_failure, set_critical_failure};
 use crate::subcommands::EvmNetworkCommand;
-use ant_bootstrap::{BootstrapCacheStore, InitialPeersConfig};
+use ant_bootstrap::{BootstrapCacheConfig, BootstrapCacheStore, InitialPeersConfig};
 use ant_evm::{get_evm_network, EvmNetwork, RewardsAddress};
 use ant_logging::metrics::init_metrics;
 use ant_logging::{Level, LogFormat, LogOutputDest, ReloadHandle};
-use ant_node::utils::get_root_dir_and_keypair;
+use ant_node::utils::{get_antnode_root_dir, get_root_dir_and_keypair};
 use ant_node::{Marker, NodeBuilder, NodeEvent, NodeEventsReceiver};
 use ant_protocol::{
-    node::get_antnode_root_dir,
     node_rpc::{NodeCtrl, StopResult},
     version,
 };
@@ -215,6 +214,10 @@ struct Opt {
     /// Print version information.
     #[clap(long)]
     version: bool,
+
+    /// Set this to true if you want the node to write the cache files in the older formats.
+    #[clap(long, default_value_t = false)]
+    write_older_cache_files: bool,
 }
 
 fn main() -> Result<()> {
@@ -284,14 +287,10 @@ fn main() -> Result<()> {
     let (log_output_dest, log_reload_handle, _log_appender_guard) =
         init_logging(&opt, keypair.public().to_peer_id())?;
 
-    let mut bootstrap_cache = BootstrapCacheStore::new_from_initial_peers_config(&opt.peers, None)?;
-    // If we are the first node, write initial cache to disk.
-    if opt.peers.first {
-        bootstrap_cache.write()?;
-    } else {
-        // Else we check/clean the file, write it back, and ensure its existence.
-        bootstrap_cache.sync_and_flush_to_disk()?;
-    }
+    let mut bootstrap_config = BootstrapCacheConfig::new(opt.peers.local)?;
+    bootstrap_config.backwards_compatible_writes = opt.write_older_cache_files;
+    let bootstrap_cache =
+        BootstrapCacheStore::new_from_initial_peers_config(&opt.peers, Some(bootstrap_config))?;
 
     let msg = format!(
         "Running {} v{}",
@@ -313,7 +312,7 @@ fn main() -> Result<()> {
     if opt.peers.local {
         rt.spawn(init_metrics(std::process::id()));
     }
-    let initial_peers = rt.block_on(opt.peers.get_addrs(None, Some(100)))?;
+    let initial_peers = rt.block_on(opt.peers.get_bootstrap_addr(None, Some(100)))?;
     info!("Initial peers len: {:?}", initial_peers.len());
     let restart_options = rt.block_on(async move {
         let mut node_builder = NodeBuilder::new(
@@ -526,10 +525,9 @@ fn init_logging(opt: &Opt, peer_id: PeerId) -> Result<(String, ReloadHandle, Opt
         ("ant_build_info".to_string(), Level::DEBUG),
         ("ant_evm".to_string(), Level::DEBUG),
         ("ant_logging".to_string(), Level::DEBUG),
-        ("ant_networking".to_string(), Level::INFO),
-        ("ant_node".to_string(), Level::DEBUG),
+        ("ant_node".to_string(), Level::INFO),
         ("ant_protocol".to_string(), Level::DEBUG),
-        ("antnode".to_string(), Level::DEBUG),
+        ("antnode".to_string(), Level::INFO),
         ("evmlib".to_string(), Level::DEBUG),
     ];
 

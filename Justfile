@@ -68,7 +68,7 @@ build-release-artifacts arch nightly="false":
     cargo binstall --no-confirm cross
     cross build --release --target $arch --bin nat-detection $nightly_feature
     cross build --release --target $arch --bin node-launchpad $nightly_feature
-    cross build --release --target $arch --bin ant $nightly_feature
+    cross build --release --target $arch --bin ant $nightly_feature --features loud
     cross build --release --target $arch --bin antnode $nightly_feature
     cross build --release --target $arch --bin antctl $nightly_feature
     cross build --release --target $arch --bin antctld $nightly_feature
@@ -76,7 +76,7 @@ build-release-artifacts arch nightly="false":
   else
     cargo build --release --target $arch --bin nat-detection $nightly_feature
     cargo build --release --target $arch --bin node-launchpad $nightly_feature
-    cargo build --release --target $arch --bin ant $nightly_feature
+    cargo build --release --target $arch --bin ant $nightly_feature --features loud
     cargo build --release --target $arch --bin antnode $nightly_feature
     cargo build --release --target $arch --bin antctl $nightly_feature
     cargo build --release --target $arch --bin antctld $nightly_feature

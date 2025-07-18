@@ -62,7 +62,6 @@ jobs:
   #         interval: 2000
   #         node-path: target/release/antnode
   #         faucet-path: target/release/faucet
-  #         platform: ${{ matrix.os }}
   #         build: true
 
   #     - name: Check ANT_PEERS was set
@@ -85,7 +84,6 @@ jobs:
   #       with:
   #         action: stop
   #         log_file_prefix: node_man_tests_user_mode
-  #         platform: ${{ matrix.os }}
 
   # node-manager-e2e-tests:
   #   name: system-wide e2e
@@ -115,7 +113,6 @@ jobs:
   #         interval: 2000
   #         node-path: target/release/antnode
   #         faucet-path: target/release/faucet
-  #         platform: ${{ matrix.os }}
   #         build: true
 
   #     - name: Check ANT_PEERS was set
@@ -153,4 +150,3 @@ jobs:
   #       with:
   #         action: stop
   #         log_file_prefix: node_man_tests_system_wide
-  #         platform: ${{ matrix.os }}

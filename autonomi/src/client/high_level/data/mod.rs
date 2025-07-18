@@ -15,6 +15,10 @@ pub mod private;
 /// Public data on the network, readable by anyone with the DataAddr
 pub mod public;
 
+mod helpers;
+
+pub(crate) use helpers::CombinedChunks;
+
 /// A [`DataAddress`] which points to a DataMap
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct DataAddress(XorName);
