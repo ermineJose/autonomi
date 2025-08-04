@@ -163,18 +163,18 @@ Manage mutable encrypted data on the network.
 - `vault_cost(key: VaultSecretKey) -> str`
     - Calculate vault storage cost
 
-- `write_bytes_to_vault(data: bytes, payment: PaymentOption, key: VaultSecretKey, content_type: int) -> str`
+- `vault_put(data: bytes, payment: PaymentOption, key: VaultSecretKey, content_type: int) -> str`
     - Write data to vault
     - Returns vault address
 
-- `fetch_and_decrypt_vault(key: VaultSecretKey) -> Tuple[bytes, int]`
+- `vault_get(key: VaultSecretKey) -> Tuple[bytes, int]`
     - Retrieve vault data
     - Returns (data, content_type)
 
-- `get_user_data_from_vault(key: VaultSecretKey) -> UserData`
+- `vault_get_user_data(key: VaultSecretKey) -> UserData`
     - Get user data from vault
 
-- `put_user_data_to_vault(key: VaultSecretKey, payment: PaymentOption, user_data: UserData) -> str`
+- `vault_put_user_data(key: VaultSecretKey, payment: PaymentOption, user_data: UserData) -> str`
     - Store user data in vault
     - Returns vault address
 

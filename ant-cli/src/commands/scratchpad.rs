@@ -7,17 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::actions::NetworkContext;
-use crate::args::max_fee_per_gas::get_max_fee_per_gas_from_opt_param;
 use crate::args::max_fee_per_gas::MaxFeePerGasParam;
+use crate::args::max_fee_per_gas::get_max_fee_per_gas_from_opt_param;
 use crate::wallet::load_wallet;
-use autonomi::client::scratchpad::SecretKey as ScratchpadSecretKey;
 use autonomi::Bytes;
 use autonomi::ScratchpadAddress;
 use autonomi::TransactionConfig;
-use color_eyre::eyre::eyre;
+use autonomi::client::scratchpad::SecretKey as ScratchpadSecretKey;
+use color_eyre::Section;
 use color_eyre::eyre::Context;
 use color_eyre::eyre::Result;
-use color_eyre::Section;
+use color_eyre::eyre::eyre;
 
 /// Generates a new general scratchpad key
 ///
@@ -121,7 +121,9 @@ pub fn share(name: String) -> Result<()> {
     let hex = scratchpad_key.to_hex();
     println!("Share this secret key with the recipient: {hex}");
     println!("The recipient can use this key to read and write to the scratchpad");
-    println!("The recipient can use the following command to get the scratchpad: `ant scratchpad get --secret-key {hex}`");
+    println!(
+        "The recipient can use the following command to get the scratchpad: `ant scratchpad get --secret-key {hex}`"
+    );
     Ok(())
 }
 

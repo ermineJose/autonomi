@@ -9,7 +9,7 @@
 pub mod key;
 pub mod user_data;
 
-pub use key::{derive_vault_key, VaultSecretKey};
+pub use key::{VaultSecretKey, derive_vault_key};
 pub use user_data::UserData;
 
 use crate::client::data_types::scratchpad::ScratchpadError;
@@ -21,10 +21,10 @@ use crate::client::utils::process_tasks_with_max_concurrency;
 use crate::client::{Client, GetError};
 use crate::graph::GraphError;
 use ant_evm::{AttoTokens, U256};
+use ant_protocol::Bytes;
 use ant_protocol::storage::{
     GraphContent, GraphEntry, GraphEntryAddress, Scratchpad, ScratchpadAddress,
 };
-use ant_protocol::Bytes;
 use bls::PublicKey;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use tracing::info;
@@ -74,7 +74,7 @@ impl Client {
     /// Retrieves and returns a decrypted vault if one exists.
     ///
     /// Returns the content type of the bytes in the vault.
-    pub async fn fetch_and_decrypt_vault(
+    pub async fn vault_get(
         &self,
         secret_key: &VaultSecretKey,
     ) -> Result<(Bytes, VaultContentType), VaultError> {
@@ -160,7 +160,7 @@ impl Client {
     /// Dynamically expand the vault capacity by paying for more space (Scratchpad) when needed.
     ///
     /// It is recommended to use the hash of the app name or unique identifier as the content type.
-    pub async fn write_bytes_to_vault(
+    pub async fn vault_put(
         &self,
         data: Bytes,
         payment_option: PaymentOption,
@@ -351,8 +351,10 @@ impl Client {
                     //   * the first descendant pointing to next GraphEntry.
                     //   * other descendants pointing to Scratchpads for content.
                     if entry.descendants.len() <= NUM_OF_SCRATCHPADS_PER_GRAPHENTRY {
-                        let msg = format!("Vault's GraphEntry at {cur_graph_entry_addr:?} only has {} descendants.",
-                            entry.descendants.len());
+                        let msg = format!(
+                            "Vault's GraphEntry at {cur_graph_entry_addr:?} only has {} descendants.",
+                            entry.descendants.len()
+                        );
                         return Err(VaultError::VaultNotEnoughGraphDescendants(msg));
                     }
                     cur_free_graphentry_derivation =

@@ -7,18 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::client::payment::{PayError, PaymentOption};
-use crate::{client::quote::CostError, Client};
 use crate::{Amount, AttoTokens};
-use ant_protocol::storage::{try_serialize_record, RecordKind};
+use crate::{Client, client::quote::CostError};
+use ant_protocol::storage::{RecordKind, try_serialize_record};
 use ant_protocol::{
-    storage::{try_deserialize_record, DataTypes},
     NetworkAddress,
+    storage::{DataTypes, try_deserialize_record},
 };
 use libp2p::kad::Record;
 
+pub use crate::Bytes;
 use crate::client::{GetError, PutError};
 use crate::networking::{NetworkError, PeerInfo};
-pub use crate::Bytes;
 pub use ant_protocol::storage::{Scratchpad, ScratchpadAddress};
 pub use bls::{PublicKey, SecretKey, Signature};
 
@@ -39,13 +39,17 @@ pub enum ScratchpadError {
     Serialization,
     #[error("Scratchpad already exists at this address: {0:?}")]
     ScratchpadAlreadyExists(ScratchpadAddress),
-    #[error("Scratchpad cannot be updated as it does not exist, please create it first or wait for it to be created")]
+    #[error(
+        "Scratchpad cannot be updated as it does not exist, please create it first or wait for it to be created"
+    )]
     CannotUpdateNewScratchpad,
     #[error("Scratchpad size is too big: {0} > {SCRATCHPAD_MAX_SIZE}")]
     ScratchpadTooBig(usize),
     #[error("Scratchpad signature is not valid")]
     BadSignature,
-    #[error("Got multiple conflicting scratchpads with the latest version, the fork can be resolved by putting a new scratchpad with a higher counter")]
+    #[error(
+        "Got multiple conflicting scratchpads with the latest version, the fork can be resolved by putting a new scratchpad with a higher counter"
+    )]
     Fork(Vec<Scratchpad>),
 }
 
@@ -103,7 +107,9 @@ impl Client {
                 let pad = match &latest_pads[..] {
                     [one] => one,
                     [_multi, ..] => {
-                        error!("Got multiple conflicting scratchpads for {scratch_key:?} with the latest version");
+                        error!(
+                            "Got multiple conflicting scratchpads for {scratch_key:?} with the latest version"
+                        );
                         return Err(ScratchpadError::Fork(latest_pads));
                     }
                     [] => {
@@ -312,7 +318,9 @@ impl Client {
             let version = p.counter() + 1;
             Scratchpad::new(owner, content_type, data, version)
         } else {
-            warn!("Scratchpad at address {address:?} cannot be updated as it does not exist, please create it first or wait for it to be created");
+            warn!(
+                "Scratchpad at address {address:?} cannot be updated as it does not exist, please create it first or wait for it to be created"
+            );
             return Err(ScratchpadError::CannotUpdateNewScratchpad);
         };
 

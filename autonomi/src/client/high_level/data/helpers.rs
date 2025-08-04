@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::Client;
 use crate::client::encryption::EncryptionStream;
 use crate::client::payment::PaymentOption;
 use crate::client::payment::Receipt;
 use crate::client::utils::format_upload_error;
 use crate::client::{ClientEvent, PutError, UploadSummary};
-use crate::Client;
 use ant_evm::{Amount, AttoTokens};
 use ant_protocol::storage::{Chunk, DataTypes};
 use evmlib::contract::payment_vault::MAX_TRANSFERS_PER_TRANSACTION;

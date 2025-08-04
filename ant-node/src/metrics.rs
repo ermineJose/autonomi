@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::Marker;
 #[cfg(feature = "open-metrics")]
 use crate::networking::MetricsRegistries;
-use crate::Marker;
 use ant_protocol::storage::DataTypes;
 use prometheus_client::{
     encoding::{EncodeLabelSet, EncodeLabelValue},
@@ -16,7 +16,7 @@ use prometheus_client::{
         counter::Counter,
         family::Family,
         gauge::Gauge,
-        histogram::{exponential_buckets, Histogram},
+        histogram::{Histogram, exponential_buckets},
         info::Info,
     },
 };

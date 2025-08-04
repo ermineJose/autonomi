@@ -7,21 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::actions::NetworkContext;
-use crate::args::max_fee_per_gas::get_max_fee_per_gas_from_opt_param;
 use crate::args::max_fee_per_gas::MaxFeePerGasParam;
+use crate::args::max_fee_per_gas::get_max_fee_per_gas_from_opt_param;
 use crate::wallet::load_wallet;
-use autonomi::client::pointer::PointerTarget;
-use autonomi::client::pointer::SecretKey as PointerSecretKey;
 use autonomi::ChunkAddress;
 use autonomi::Client;
 use autonomi::GraphEntryAddress;
 use autonomi::PointerAddress;
 use autonomi::ScratchpadAddress;
 use autonomi::TransactionConfig;
-use color_eyre::eyre::eyre;
+use autonomi::client::pointer::PointerTarget;
+use autonomi::client::pointer::SecretKey as PointerSecretKey;
+use color_eyre::Section;
 use color_eyre::eyre::Context;
 use color_eyre::eyre::Result;
-use color_eyre::Section;
+use color_eyre::eyre::eyre;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TargetDataType {
@@ -192,7 +192,9 @@ pub fn share(name: String) -> Result<()> {
     let hex = pointer_key.to_hex();
     println!("Share this secret key with the recipient: {hex}");
     println!("The recipient can use this key to read and write to the pointer");
-    println!("The recipient can use the following command to get the pointer: `ant pointer get --secret-key {hex}`");
+    println!(
+        "The recipient can use the following command to get the pointer: `ant pointer get --secret-key {hex}`"
+    );
     Ok(())
 }
 

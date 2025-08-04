@@ -9,8 +9,8 @@
 #![allow(clippy::expect_used)]
 
 use ant_logging::LogBuilder;
-use autonomi::client::payment::PaymentOption;
 use autonomi::Client;
+use autonomi::client::payment::PaymentOption;
 use eyre::Result;
 use serial_test::serial;
 use sha2::{Digest, Sha256};
@@ -95,13 +95,13 @@ async fn file_into_vault() -> Result<()> {
     let archive = client.archive_get_public(&addr).await?;
     let set_version = 0;
     client
-        .write_bytes_to_vault(archive.to_bytes()?, wallet.into(), &client_sk, set_version)
+        .vault_put(archive.to_bytes()?, wallet.into(), &client_sk, set_version)
         .await?;
 
     // now assert over the stored account packet
     let new_client = Client::init_local().await?;
 
-    let (ap, got_version) = new_client.fetch_and_decrypt_vault(&client_sk).await?;
+    let (ap, got_version) = new_client.vault_get(&client_sk).await?;
     assert_eq!(set_version, got_version);
     let ap_archive_fetched =
         autonomi::client::files::archive_public::PublicArchive::from_bytes(ap)?;

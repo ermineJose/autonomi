@@ -69,7 +69,7 @@ mod test {
             .await?
             .with_vault_entropy(Bytes::from("at least 32 bytes of entropy here"))?;
 
-        if let Some(ap) = new_client.fetch_and_decrypt_vault().await? {
+        if let Some(ap) = new_client.vault_get().await? {
             let ap_root_fetched = Client::deserialise_root(ap)?;
 
             assert_eq!(

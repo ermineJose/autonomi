@@ -18,7 +18,7 @@ use std::{
 use ant_bootstrap::BootstrapCacheConfig;
 use ant_evm::{PaymentQuote, QuotingMetrics, RewardsAddress};
 use ant_protocol::storage::DataTypes;
-use bls::{PublicKey, SecretKey, PK_SIZE};
+use bls::{PK_SIZE, PublicKey, SecretKey};
 use bytes::Bytes;
 use exponential_backoff::Backoff;
 use libp2p::Multiaddr;
@@ -30,11 +30,15 @@ use pyo3::{
 use pyo3_async_runtimes::tokio::future_into_py;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use xor_name::{XorName, XOR_NAME_LEN};
+use xor_name::{XOR_NAME_LEN, XorName};
 
 // Internal imports
 use crate::{
+    Amount, AttoTokens, Chunk, ChunkAddress, Client, ClientConfig, ClientOperatingStrategy,
+    GraphEntry, GraphEntryAddress, InitialPeersConfig, MaxFeePerGas, Network as EVMNetwork,
+    Pointer, PointerAddress, Scratchpad, ScratchpadAddress, Signature, TransactionConfig, Wallet,
     client::{
+        ClientEvent, UploadSummary,
         chunk::DataMapChunk,
         data::DataAddress,
         files::{archive_private::PrivateArchiveDataMap, archive_public::ArchiveAddress},
@@ -45,14 +49,10 @@ use crate::{
         pointer::PointerTarget,
         quote::{QuoteForAddress, StoreQuote},
         vault::{UserData, VaultSecretKey},
-        ClientEvent, UploadSummary,
     },
     files::{Metadata, PrivateArchive, PublicArchive},
     networking::{PeerId, Quorum, RetryStrategy, Strategy},
     register::{RegisterAddress, RegisterHistory},
-    Amount, AttoTokens, Chunk, ChunkAddress, Client, ClientConfig, ClientOperatingStrategy,
-    GraphEntry, GraphEntryAddress, InitialPeersConfig, MaxFeePerGas, Network as EVMNetwork,
-    Pointer, PointerAddress, Scratchpad, ScratchpadAddress, Signature, TransactionConfig, Wallet,
 };
 
 #[pyclass(name = "AttoTokens")]
@@ -951,7 +951,7 @@ impl PyClient {
     /// Dynamically expand the vault capacity by paying for more space (Scratchpad) when needed.
     ///
     /// It is recommended to use the hash of the app name or unique identifier as the content type.
-    fn write_bytes_to_vault<'a>(
+    fn vault_put<'a>(
         &self,
         py: Python<'a>,
         data: Vec<u8>,
@@ -965,7 +965,7 @@ impl PyClient {
 
         future_into_py(py, async move {
             match client
-                .write_bytes_to_vault(bytes::Bytes::from(data), payment, &key, content_type)
+                .vault_put(bytes::Bytes::from(data), payment, &key, content_type)
                 .await
             {
                 Ok(cost) => Ok(cost.to_string()),
@@ -1085,16 +1085,12 @@ impl PyClient {
     /// Retrieves and returns a decrypted vault if one exists.
     ///
     /// Returns the content type of the bytes in the vault.
-    fn fetch_and_decrypt_vault<'a>(
-        &self,
-        py: Python<'a>,
-        key: &PyVaultSecretKey,
-    ) -> PyResult<Bound<'a, PyAny>> {
+    fn vault_get<'a>(&self, py: Python<'a>, key: &PyVaultSecretKey) -> PyResult<Bound<'a, PyAny>> {
         let client = self.inner.clone();
         let key = key.inner.clone();
 
         future_into_py(py, async move {
-            match client.fetch_and_decrypt_vault(&key).await {
+            match client.vault_get(&key).await {
                 Ok((data, content_type)) => Ok((data.to_vec(), content_type)),
                 Err(e) => Err(PyRuntimeError::new_err(format!(
                     "Failed to fetch vault: {e}"
@@ -1104,7 +1100,7 @@ impl PyClient {
     }
 
     /// Get the user data from the vault
-    fn get_user_data_from_vault<'a>(
+    fn vault_get_user_data<'a>(
         &self,
         py: Python<'a>,
         key: &PyVaultSecretKey,
@@ -1113,7 +1109,7 @@ impl PyClient {
         let key = key.inner.clone();
 
         future_into_py(py, async move {
-            match client.get_user_data_from_vault(&key).await {
+            match client.vault_get_user_data(&key).await {
                 Ok(user_data) => Ok(PyUserData { inner: user_data }),
                 Err(e) => Err(PyRuntimeError::new_err(format!(
                     "Failed to get user data from vault: {e}"
@@ -1125,7 +1121,7 @@ impl PyClient {
     /// Put the user data to the vault.
     ///
     /// Returns the total cost of the put operation.
-    fn put_user_data_to_vault<'a>(
+    fn vault_put_user_data<'a>(
         &self,
         py: Python<'a>,
         key: &PyVaultSecretKey,
@@ -1138,10 +1134,7 @@ impl PyClient {
         let user_data = user_data.inner.clone();
 
         future_into_py(py, async move {
-            match client
-                .put_user_data_to_vault(&key, payment, user_data)
-                .await
-            {
+            match client.vault_put_user_data(&key, payment, user_data).await {
                 Ok(cost) => Ok(cost.to_string()),
                 Err(e) => Err(PyRuntimeError::new_err(format!(
                     "Failed to put user data: {e}"

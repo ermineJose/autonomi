@@ -25,20 +25,20 @@ def main():
         # Store some data in vault
         data = b"Hello from vault!"
         content_type = 1  # Custom content type
-        cost = client.write_bytes_to_vault(data, payment, vault_key, content_type)
+        cost = client.vault_put(data, payment, vault_key, content_type)
         print(f"Wrote data to vault, cost: {cost}")
         
         # Read data back
-        retrieved_data, retrieved_type = client.fetch_and_decrypt_vault(vault_key)
+        retrieved_data, retrieved_type = client.vault_get(vault_key)
         print(f"Retrieved data: {retrieved_data.decode()}")
         print(f"Content type: {retrieved_type}")
         
         # Store user data
-        cost = client.put_user_data_to_vault(vault_key, payment, user_data)
+        cost = client.vault_put_user_data(vault_key, payment, user_data)
         print(f"Stored user data, cost: {cost}")
         
         # Get user data
-        retrieved_user_data = client.get_user_data_from_vault(vault_key)
+        retrieved_user_data = client.vault_get_user_data(vault_key)
         print("File archives:", retrieved_user_data.file_archives())
         print("Private file archives:", retrieved_user_data.private_file_archives())
         

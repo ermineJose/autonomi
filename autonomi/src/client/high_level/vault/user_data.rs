@@ -8,18 +8,18 @@
 
 use std::collections::HashMap;
 
+use crate::client::Client;
+use crate::client::GetError;
 use crate::client::high_level::files::archive_private::PrivateArchiveDataMap;
 use crate::client::high_level::files::archive_public::ArchiveAddress;
 use crate::client::payment::PaymentOption;
-use crate::client::Client;
-use crate::client::GetError;
 use crate::register::RegisterAddress;
 use ant_evm::AttoTokens;
 use ant_protocol::Bytes;
 use serde::{Deserialize, Serialize};
 use std::sync::LazyLock;
 
-use super::{app_name_to_vault_content_type, VaultContentType, VaultError, VaultSecretKey};
+use super::{VaultContentType, VaultError, VaultSecretKey, app_name_to_vault_content_type};
 
 /// Vault content type for UserDataVault
 pub static USER_DATA_VAULT_CONTENT_IDENTIFIER: LazyLock<VaultContentType> =
@@ -151,11 +151,11 @@ impl UserData {
 
 impl Client {
     /// Get the user data from the vault
-    pub async fn get_user_data_from_vault(
+    pub async fn vault_get_user_data(
         &self,
         secret_key: &VaultSecretKey,
     ) -> Result<UserData, UserDataVaultError> {
-        let (bytes, content_type) = self.fetch_and_decrypt_vault(secret_key).await?;
+        let (bytes, content_type) = self.vault_get(secret_key).await?;
 
         if content_type != *USER_DATA_VAULT_CONTENT_IDENTIFIER {
             return Err(UserDataVaultError::UnsupportedVaultContentType(
@@ -173,7 +173,7 @@ impl Client {
     /// Put the user data to the vault
     ///
     /// Returns the total cost of the put operation
-    pub async fn put_user_data_to_vault(
+    pub async fn vault_put_user_data(
         &self,
         secret_key: &VaultSecretKey,
         payment_option: PaymentOption,
@@ -183,7 +183,7 @@ impl Client {
             UserDataVaultError::Serialization(format!("Failed to serialize user data: {e}"))
         })?;
         let total_cost = self
-            .write_bytes_to_vault(
+            .vault_put(
                 bytes,
                 payment_option,
                 secret_key,

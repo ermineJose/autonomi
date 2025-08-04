@@ -6,11 +6,11 @@ use ant_evm::{QuoteHash, TxHash};
 use ant_logging::LogBuilder;
 use ant_protocol::storage::DataTypes;
 use autonomi::client::external_signer::encrypt_data;
-use autonomi::client::files::{archive_private::PrivateArchive, Metadata};
-use autonomi::client::payment::{receipt_from_store_quotes, Receipt};
+use autonomi::client::files::{Metadata, archive_private::PrivateArchive};
+use autonomi::client::payment::{Receipt, receipt_from_store_quotes};
 use autonomi::client::quote::StoreQuote;
-use autonomi::client::vault::user_data::USER_DATA_VAULT_CONTENT_IDENTIFIER;
 use autonomi::client::vault::VaultSecretKey;
+use autonomi::client::vault::user_data::USER_DATA_VAULT_CONTENT_IDENTIFIER;
 use autonomi::vault::UserData;
 use autonomi::{Client, Scratchpad, Wallet};
 use bytes::Bytes;
@@ -158,10 +158,10 @@ async fn external_signer_put() -> eyre::Result<()> {
     sleep(Duration::from_secs(5)).await;
 
     let _ = client
-        .put_user_data_to_vault(&vault_key, receipt.into(), user_data)
+        .vault_put_user_data(&vault_key, receipt.into(), user_data)
         .await?;
 
-    let fetched_user_data = client.get_user_data_from_vault(&vault_key).await?;
+    let fetched_user_data = client.vault_get_user_data(&vault_key).await?;
 
     let fetched_private_archive_access = fetched_user_data
         .private_file_archives
